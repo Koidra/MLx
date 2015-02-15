@@ -4,14 +4,17 @@
 
 namespace MLx
 {
-    // Example is a numeric data row that can be used directly by learners
-    class Example {
+    //Example is a numeric data row that can be used directly by learners
+    class Example final {
+        UREF<Vector> features_;
+        UREF<string> name_;
     public:
-        const UREF<Vector> Features;
+        size_t Id; //ToDo
         const float Label;
         const float Weight;
-        const UREF<string> Name;
 
         Example(Vector* features, float label, float weight = 1, UREF<string> name = nullptr);
+        const Vector& Features() const;
+        const string& Name() const;
     };
 }
