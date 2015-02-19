@@ -20,45 +20,56 @@ namespace MLx {
         return &*schema_;
     }
 
-    ExampleIterator Examples::begin() const {
+    Examples::Iterator Examples::begin() const {
         state_->Reset();
-        return ExampleIterator(&*state_);
+        return Iterator(&*state_);
     }
 
-    ExampleIterator NullIter = ExampleIterator(nullptr);
-    ExampleIterator Examples::end() const {
+    auto NullIter = Examples::Iterator(nullptr);
+    Examples::Iterator Examples::end() const {
         return NullIter;
     }
 
-    ExampleIterator::ExampleIterator(ExamplesReadState *state) : state_(state) {}
+    Examples::Iterator::Iterator(State *state) : state_(state) {}
 
-    const Example& ExampleIterator::operator*() const {
+    const Example& Examples::Iterator::operator*() const {
         return *(state_->Current());
     }
 
-    const Example* ExampleIterator::operator->() const {
+    const Example* Examples::Iterator::operator->() const {
         return state_->Current();
     }
 
-    ExampleIterator ExampleIterator::operator++() {
-        return  state_->MoveNext() ? ExampleIterator(state_) : NullIter;
+    Examples::Iterator Examples::Iterator::operator++() {
+        return  state_->MoveNext() ? Iterator(state_) : NullIter;
     }
 
-    bool ExampleIterator::operator!=(const ExampleIterator &other) {
+    bool Examples::Iterator::operator!=(const Iterator &other) {
         return other.state_ != state_;
     }
 
-    InMemoryExamples::InMemoryExamples(REF<DataSchema> schema, bool isSparse)
+    class InMemoryExamples::State final : public Examples::State {
+        const vector<Example>* data_;
+        vector<Example>::const_iterator iter_;
+    public:
+        State(vector<Example>* data) : data_(data), iter_(data->begin()) { }
+        void Reset() override {
+            iter_ = data_->begin();
+        }
+        bool MoveNext() override {
+            return ++iter_ != data_->end();
+        }
+        const Example* Current() const override {
+            return &*iter_;
+        }
+    };
+
+    InMemoryExamples::InMemoryExamples(REF<DataSchema> schema, bool isSparse, std::vector<Example> &data)
+            : data_(move(data))
     {
         schema_ = schema;
         isSparse_ = isSparse;
-        state_ = UREF<ExamplesReadState>(new InMemoryExamples::State(data_));
-    }
-
-    InMemoryExamples::InMemoryExamples(REF<DataSchema> schema, bool isSparse, std::vector<Example> &data)
-            : InMemoryExamples(schema, isSparse)
-    {
-        data_ = move(data);
+        state_ = UREF<State>(new InMemoryExamples::State(&data_));
     }
 
     size_t InMemoryExamples::Size() {
@@ -69,32 +80,28 @@ namespace MLx {
         data_.push_back(move(*example));
     }
 
-    InMemoryExamples::State::State(std::vector<Example> &data)
-            : data_(&data), iterator_(data.begin()) {}
-
-    void InMemoryExamples::State::Reset() {
-        iterator_ = data_->begin();
-    }
-
-    bool InMemoryExamples::State::MoveNext() {
-        return ++iterator_ != data_->end();
-    }
-
-    const Example* InMemoryExamples::State::Current() const {
-        return &(*iterator_);
-    }
-
     StreamingExamples::operator InMemoryExamples() {
-        if (cache_.empty())
-            ((StreamingExamples::StreamingLoaderState&)(*state_)).Cache(cache_);
-        return  InMemoryExamples(schema_, isSparse_, cache_);
+        return  InMemoryExamples(schema_, isSparse_, ((StreamingExamples::State &)(*state_)).Cache());
     }
 
-    void StreamingExamples::StreamingLoaderState::Cache(vector<Example> &cache) {
-        cache.clear();
-        Reset();
-        do{
-            cache.push_back(move(*current_));
-        } while (MoveNext());
+    StreamingExamples::State::~State() {
+        if (current_ != nullptr && cache_.empty())
+            delete current_;
+    }
+
+    const Example* StreamingExamples::State::Current() const {
+        return current_;
+    }
+
+    vector<Example>& StreamingExamples::State::Cache() {
+        if (cache_.empty())
+        {
+            cache_.clear();
+            Reset();
+            do{
+                cache_.push_back(move(*current_));
+            } while (MoveNext());
+        }
+        return cache_;
     }
 }

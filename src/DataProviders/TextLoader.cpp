@@ -45,39 +45,47 @@ namespace MLx {
         size_t featureColumnOffset_; //feature columns start here
     };
 
-    class TextLoader::TextLoaderState : public StreamingExamples::StreamingLoaderState {
+    class TextLoader::State final : public StreamingExamples::State {
         ifstream fstream_;
         const size_t dataSeekPosition_;
         UREF<ExampleParser> parser_;
     public:
         void Reset() override {
-            fstream_.seekg(dataSeekPosition_);
-            string line;
-            assert(getline(fstream_, line));
-            current_ = UREF<Example>(parser_->Parse(line));
+            if (cache_.empty())
+            {
+                fstream_.seekg(dataSeekPosition_);
+                string line;
+                assert(getline(fstream_, line));
+
+                if (current_ != nullptr)
+                    delete current_;
+                current_ = parser_->Parse(line);
+            }
+            else
+                current_ = &cache_[0];
         }
 
-        TextLoaderState(ifstream &fstream, size_t dataSeekPosition, ExampleParser* parser)
-                : fstream_(move(fstream)), dataSeekPosition_(move(dataSeekPosition)), parser_(parser)
+        State(ifstream &fstream, size_t dataSeekPosition, ExampleParser* parser)
+                : fstream_(move(fstream)), dataSeekPosition_(dataSeekPosition), parser_(parser)
         {
             Reset();
         }
 
         bool MoveNext() override {
-            string line;
-            if (getline(fstream_, line))
+            if (cache_.empty())
             {
-                current_ = UREF<Example>(parser_->Parse(line));
-                return true;
+                string line;
+                if (getline(fstream_, line))
+                {
+                    current_ = parser_->Parse(line);
+                    return true;
+                }
+                return false;
             }
-            return false;
+            return ++current_ <= cache_.back();
         }
 
-        const Example* Current() const override {
-            return &*current_;
-        }
-
-        ~TextLoaderState() {
+        ~State() {
             if (fstream_.is_open())
                 fstream_.close();
         }
@@ -94,6 +102,7 @@ namespace MLx {
         int weightCol = -1;
         int nameCol = -1;
         string labelMapFile = "";
+        bool cache = true;
 
         string header;
         while(fileStream.good() && (header.length() == 0 || boost::starts_with(header, "//")))
@@ -153,7 +162,11 @@ namespace MLx {
                 ? (ExampleParser*) new SparseParser(dimension, labelCol, weightCol, nameCol, separator, labelMapFile)
                 : (ExampleParser*) new DenseParser(dimension, labelCol, weightCol, nameCol, isNonFeature, separator, labelMapFile);
 
-        state_ = UREF<ExamplesReadState>(new TextLoaderState(fileStream, dataSeekPosition, parser));
+        State* state = new State(fileStream, dataSeekPosition, parser);
+        state_ = UREF<State>(state);
+
+        if (cache)
+            state->Cache();
     }
 
     ExampleParser::ExampleParser(int dimension, int labelCol, int weightCol, int nameCol, char separator, const std::string& labelMapFile)

@@ -4,4 +4,5 @@
 *.iws
 
 # Binaries
-.o
+*.o
+*.a
