@@ -1,3 +1,8 @@
+/*
+Authors: Kenneth Tran <one@kentran.net>
+License: BSD 3 clause
+ */
+
 #pragma once
 
 #include "../Core/Vector.h"

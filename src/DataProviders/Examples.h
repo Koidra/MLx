@@ -1,3 +1,8 @@
+/*
+Authors: Kenneth Tran <one@kentran.net>
+License: BSD 3 clause
+ */
+
 #pragma once
 #include "Example.h"
 
@@ -6,7 +11,7 @@ namespace MLx {
     public:
         StrVec FeatureNames;
         DataSchema(StrVec& featureNames);
-        size_t GetDimension();
+        size_t Dimension() const;
     };
 
     class Examples {
@@ -26,7 +31,7 @@ namespace MLx {
 
     public:
         struct Iterator {
-            Iterator(State *state);
+            Iterator(const State *state);
             const Example& operator*() const;
             const Example* operator->() const;
             Iterator operator++();
@@ -36,9 +41,10 @@ namespace MLx {
         };
 
         bool IsSparse();
-        DataSchema* GetSchema();
+        const DataSchema* Schema() const;
         Iterator begin() const;
         Iterator end() const;
+        virtual void Serialize(const string& filename) const = 0;
     };
 
     class RandomAccessExamples : public Examples {
@@ -46,9 +52,8 @@ namespace MLx {
         virtual size_t Size() = 0;
     };
 
-    class InMemoryExamples final : public RandomAccessExamples {
+    class InMemoryExamples : public RandomAccessExamples {
     public:
-        InMemoryExamples(REF<DataSchema> schema, bool isSparse);
         InMemoryExamples(REF<DataSchema> schema, bool isSparse, std::vector<Example> &data);
         size_t  Size() override;
         void Add(UREF<Example> example); //this takes ownership of Example embedded in the parameter

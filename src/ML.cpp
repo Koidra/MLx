@@ -1,3 +1,8 @@
+/*
+Authors: Kenneth Tran <one@kentran.net>
+License: BSD 3 clause
+ */
+
 #include "Core/Commons.h"
 #include "DataProviders/DataProviders.h"
 

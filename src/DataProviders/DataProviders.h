@@ -1,9 +1,13 @@
+/*
+Authors: Kenneth Tran <one@kentran.net>
+License: BSD 3 clause
+ */
+
 #pragma once
 #include "TextLoader.h"
 
 namespace MLx {
-    class DataProviders {
-    public:
-        static Examples* Load(std::string& fileName, std::string& settings);
+    namespace DataProviders {
+        Examples* Load(std::string& fileName, std::string& settings);
     };
 }

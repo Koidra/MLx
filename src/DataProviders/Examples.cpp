@@ -8,15 +8,15 @@ namespace MLx {
     DataSchema::DataSchema(StrVec& featureNames) : FeatureNames(move(featureNames)) {
     }
 
-    size_t DataSchema::GetDimension() {
-        return (FeatureNames).size();
+    size_t DataSchema::Dimension() const {
+        return FeatureNames.size();
     }
 
     bool Examples::IsSparse() {
         return isSparse_;
     }
 
-    DataSchema* Examples::GetSchema() {
+    const DataSchema* Examples::Schema() const {
         return &*schema_;
     }
 
@@ -30,7 +30,7 @@ namespace MLx {
         return NullIter;
     }
 
-    Examples::Iterator::Iterator(State *state) : state_(state) {}
+    Examples::Iterator::Iterator(const State *state) : state_(state) {}
 
     const Example& Examples::Iterator::operator*() const {
         return *(state_->Current());
@@ -49,16 +49,19 @@ namespace MLx {
     }
 
     class InMemoryExamples::State final : public Examples::State {
-        const vector<Example>* data_;
-        vector<Example>::const_iterator iter_;
+        const std::vector<Example>* data_;
+        std::vector<Example>::const_iterator iter_;
     public:
-        State(vector<Example>* data) : data_(data), iter_(data->begin()) { }
+        State(std::vector<Example>* data) : data_(data), iter_(data->begin()) { }
+
         void Reset() override {
             iter_ = data_->begin();
         }
+
         bool MoveNext() override {
             return ++iter_ != data_->end();
         }
+
         const Example* Current() const override {
             return &*iter_;
         }
