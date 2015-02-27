@@ -1,3 +1,4 @@
+Age,Workclass,Fnlwgt,Education,Years in Education,Marital Status,Occupation,Relationship Status,Race,Sex,Capital Gain,Capital Loss,Hours per week,Native Country,Label
 44, Private, 162028, 11th, 7, Divorced, Sales, Unmarried, White, Female, 0, 0, 44, United-States, <=50K
 20, Private, 197997, Some-college, 10, Never-married, Prof-specialty, Own-child, White, Male, 0, 0, 40, United-States, <=50K
 46, Private, 98350, 10th, 6, Married-spouse-absent, Other-service, Not-in-family, Asian-Pac-Islander, Male, 0, 0, 37, China, <=50K
