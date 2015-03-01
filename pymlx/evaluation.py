@@ -5,11 +5,15 @@ from sklearn import metrics as skmetrics
 from matplotlib import pyplot as plt
 from model import BinaryClassifier
 
-
 def pr_scorer(predictor, X, y):
     p = predictor.predict_proba(X)[:, 1]
     precision, recall, thresholds = skmetrics.precision_recall_curve(y, p)
     return skmetrics.auc(recall, precision)
+
+
+def log_loss(truths, predictions):
+    return [- (truths[i] * numpy.log(p) + (1 - truths[i]) * numpy.log(1 - p))
+            for i, p in enumerate(predictions)]
 
 
 def _plot_curve(x, y, title, x_label, y_label):
@@ -48,7 +52,6 @@ def _show_confusion_matrix(truths, predictions, threshold):
     print('         ===========================')
     print('Precision   N: {0:.2f}%     P: {1:.2f}%'.format(float(tn) / (tn + fn) * 100,
                                                            float(tp) / (fp + tp) * 100))
-
 
 def confusion_matrix(truths, predictions, sampling_rate=1):
     from IPython.html.widgets import interact, fixed

@@ -28,6 +28,7 @@ def load_data(filename, label_col=None, id_col=None, feature_cols=None, excluded
         df.drop(excluded_cols, axis=1, inplace=True)
         return df
 
+
 def load_featurized_data(filename, label_col, feat, in_memory=True):
     """
     Load raw data into extracted features and labels
@@ -65,11 +66,13 @@ def load_featurized_data(filename, label_col, feat, in_memory=True):
 
         return feat.to_matrix(data), labels
 
+
 def get_fscores(predictor, feature_names=None):
     fscores = predictor.booster().get_fscore()
     if feature_names is not None:
         fscores = {feature_names[int(f[1:])]: fscores[f] for f in fscores}
     return Series(fscores).order(ascending=False)
+
 
 def field_types(df):
     types = {}

@@ -48,6 +48,22 @@ class BoolHandler(NoHandler):
     """
 
 
+# Mapper handler maps input features to output features via a function (e.g. a lambda)
+class MapperHandler(FeaturesHandler):
+    def __init__(self, in_feature_names, out_feature_names, mapper):
+        """
+        :param in_feature_names: list of input feature names
+        :param out_feature_names: list of output feature names
+        :param mapper: a function that takes a list and return another list
+        """
+        super(self.__class__, self).__init__(in_feature_names)
+        self.out_feature_names = out_feature_names
+        self._mapper = mapper
+
+    def apply(self, input_generator):
+        return enumerate(self._mapper(list(input_generator)))
+
+
 class CategoricalHandler(FeaturesHandler):
     def __init__(self, in_feature_names, cats={}, preprocessor=None):
         for in_feature_name in cats:

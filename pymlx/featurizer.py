@@ -113,6 +113,7 @@ class Featurizer:
             self.add_features(data, row)
         return self.to_matrix(data)
 
+
 class CompositionHandler(FeaturesHandler):
     def __init__(self, handler1, handler2):
         assert isinstance(handler2, FeaturesHandler)
