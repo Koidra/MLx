@@ -1,8 +1,14 @@
 # MLx
-a highly scalable (yet easy to use) machine learning library.
+*A highly scalable (yet easy to use) machine learning library.*
 
 
-##Why not using existing open source packages?==
+###Q&As
+1. Why not using existing open source packages?
+  - We may leverage some existing libraries (e.g. LibLinear or LibSVM)
+  - None of the existing libraries satifies all of our criteria
 
+2. So what are the differentiations of this library
+  - Well, we will cover them later, when it's mature enough.
 
-Linear Learning Library based on LibLinear
+3. What's the OSS license of this library
+  - BSD3
