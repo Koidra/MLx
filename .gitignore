@@ -2,3 +2,6 @@
 .idea/
 *.iml
 *.iws
+
+# Binaries
+.o
