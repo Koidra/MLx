@@ -1,5 +1,5 @@
 # MLx
-*A highly scalable (yet easy to use) machine learning library.*
+*A highly scalable yet easy to use machine learning library.*
 
 
 ###Q&As
