@@ -1,6 +1,9 @@
 # MLx
 *A highly scalable machine learning library.*
 
+###Requirements
+- A BLAS library installed (e.g. OpenBLAS is free)
+
 
 ###Q&As
 1. Why not using existing open source packages?
