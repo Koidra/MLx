@@ -12,10 +12,8 @@ namespace MLx {
     class Examples;
     class ExampleIterator;
     class ExamplesReadState;
-    class InMemoryExamples;
 
     class Examples {
-    friend class InMemoryExamples;
     public:
         bool IsSparse();
         DataSchema* GetSchema();
@@ -23,8 +21,8 @@ namespace MLx {
         ExampleIterator end() const;
 
     protected:
+        REF<DataSchema> schema_;
         bool isSparse_;
-        UREF<DataSchema> schema_;
         UREF<ExamplesReadState> state_;
     };
 
@@ -45,12 +43,17 @@ namespace MLx {
         virtual const Example* Current() const = 0;
     };
 
-    class InMemoryExamples final : public Examples {
+    class ShuffleExamples : public Examples {
     public:
-        //This ctor takes ownership of the data
-        InMemoryExamples(Examples &src);
-        bool IsEmpty();
-        size_t  Size();
+        virtual size_t Size() = 0;
+    };
+
+    class InMemoryExamples final : public ShuffleExamples {
+    public:
+        InMemoryExamples(REF<DataSchema> schema, bool isSparse);
+        InMemoryExamples(REF<DataSchema> schema, bool isSparse, std::vector<Example> &data);
+        size_t  Size() override;
+        void Add(UREF<Example> example); //this takes ownership of Example embedded in the parameter
     private:
         std::vector<Example> data_;
         class State final : public ExamplesReadState {
@@ -66,8 +69,14 @@ namespace MLx {
 
     class StreamingExamples : public Examples {
     public:
-        REF<InMemoryExamples> Cache();
+        explicit operator InMemoryExamples();
     protected:
-        REF<InMemoryExamples> cached_;
+        std::vector<Example> cache_;
+        class StreamingLoaderState : public ExamplesReadState {
+        public:
+            void Cache(std::vector<Example> &cache);
+        protected:
+            UREF<Example> current_;
+        };
     };
 }

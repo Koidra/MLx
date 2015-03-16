@@ -45,11 +45,10 @@ namespace MLx {
         size_t featureColumnOffset_; //feature columns start here
     };
 
-    class TextLoaderState : public ExamplesReadState {
+    class TextLoader::TextLoaderState : public StreamingExamples::StreamingLoaderState {
         ifstream fstream_;
         const size_t dataSeekPosition_;
         UREF<ExampleParser> parser_;
-        UREF<Example> current_;
     public:
         void Reset() override {
             fstream_.seekg(dataSeekPosition_);
@@ -84,7 +83,8 @@ namespace MLx {
         }
     };
 
-    TextLoader::TextLoader(const string &filename, const string &settings) {
+    TextLoader::TextLoader(const string &filename, const string &settings)
+    {
         ifstream fileStream(filename);
         CheckArg(fileStream.good(), "Can't locate or read data file");
 
