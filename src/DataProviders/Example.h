@@ -5,8 +5,9 @@
 namespace MLx
 {
     // Example is a numeric data row that can be used directly by learners
-    class Example {
+    class Example final {
     public:
+        size_t Id;
         const UREF<Vector> Features;
         const float Label;
         const float Weight;

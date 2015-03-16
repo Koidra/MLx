@@ -1,3 +1,8 @@
+/*
+Authors: Kenneth Tran <one@kentran.net>
+License: BSD 3 clause
+ */
+
 #include "TextLoader.h"
 
 namespace MLx {
@@ -5,10 +10,11 @@ namespace MLx {
     using namespace Contracts;
     using namespace Utils;
 
+    //Remark: this is a thick class. It should never be passed or defined as value
     class ExampleParser {
     public:
         ExampleParser(int dimension, int labelCol, int weightCol, int nameCol, char separator, const std::string& labelMapFile);
-        Example* Parse(const std::string& line);
+        Example* Parse(const string& line) const;
 
     protected:
         const int dimension_;
@@ -16,16 +22,16 @@ namespace MLx {
         const int weightCol_;
         const int nameCol_;
         const char separator_;
-        std::unordered_map<std::string,float> labelMap_;
+        unordered_map<string,float> labelMap_;
 
-        virtual Vector* ParseFeatures(const StrVec &columns) = 0;
+        virtual Vector* ParseFeatures(const StrVec &columns) const = 0;
     };
 
     class DenseParser final : public ExampleParser {
     public:
         DenseParser(int dimension, int labelCol, int weightCol, int nameCol, const BoolVec &nonFeature, char separator, const std::string &labelMapFile);
     protected:
-        Vector* ParseFeatures(const StrVec &columns) override;
+        Vector* ParseFeatures(const StrVec &columns) const override;
     private:
         IntVec parseIndices_;
     };
@@ -34,18 +40,47 @@ namespace MLx {
     public:
         SparseParser(int dimension, int labelCol, int weightCol, int nameCol, char separator, const std::string &labelMapFile);
     protected:
-        Vector* ParseFeatures(const StrVec &columns) override;
+        Vector* ParseFeatures(const StrVec &columns) const override;
     private:
         size_t featureColumnOffset_; //feature columns start here
     };
 
-    class TextLoader::Impl {
+    class TextLoaderState : public ExamplesReadState {
+        ifstream fstream_;
+        const size_t dataSeekPosition_;
+        UREF<ExampleParser> parser_;
+        UREF<Example> current_;
     public:
-        std::ifstream FileStream;
-        UREF<ExampleParser> Parser;
-        size_t DataSeekPosition;
-        ~Impl() {
-            FileStream.close();
+        void Reset() override {
+            fstream_.seekg(dataSeekPosition_);
+            string line;
+            assert(getline(fstream_, line));
+            current_ = UREF<Example>(parser_->Parse(line));
+        }
+
+        TextLoaderState(ifstream &fstream, size_t dataSeekPosition, ExampleParser* parser)
+                : fstream_(move(fstream)), dataSeekPosition_(move(dataSeekPosition)), parser_(parser)
+        {
+            Reset();
+        }
+
+        bool MoveNext() override {
+            string line;
+            if (getline(fstream_, line))
+            {
+                current_ = UREF<Example>(parser_->Parse(line));
+                return true;
+            }
+            return false;
+        }
+
+        const Example* Current() const override {
+            return &*current_;
+        }
+
+        ~TextLoaderState() {
+            if (fstream_.is_open())
+                fstream_.close();
         }
     };
 
@@ -102,10 +137,10 @@ namespace MLx {
                 featureNames.push_back(move(cols[i]));
         }
 
-        schema_ = REF<DataSchema>(new DataSchema(featureNames));
+        schema_ = UREF<DataSchema>(new DataSchema(featureNames));
 
         //Check if this is a sparse or dense dataset
-        impl_->DataSeekPosition = fileStream.tellg();
+        size_t dataSeekPosition = fileStream.tellg();
         string firstDataLine;
         getline(fileStream, firstDataLine);
         StrVec firstDataLineColumns = Split(firstDataLine, separator);
@@ -114,22 +149,12 @@ namespace MLx {
         isSparse_ = firstInstanceColumnCount < numCols;
 
         size_t dimension = schema_->GetDimension();
-        auto parser = isSparse_
+        ExampleParser* parser = isSparse_
                 ? (ExampleParser*) new SparseParser(dimension, labelCol, weightCol, nameCol, separator, labelMapFile)
                 : (ExampleParser*) new DenseParser(dimension, labelCol, weightCol, nameCol, isNonFeature, separator, labelMapFile);
 
-        impl_->FileStream = move(fileStream);
-        impl_->Parser = UREF<ExampleParser>(parser);
+        state_ = UREF<ExamplesReadState>(new TextLoaderState(fileStream, dataSeekPosition, parser));
     }
-
-    ExamplesIterator* TextLoader::begin() {
-        return nullptr;
-    }
-
-    ExamplesIterator* TextLoader::end() {
-        return nullptr;
-    }
-
 
     ExampleParser::ExampleParser(int dimension, int labelCol, int weightCol, int nameCol, char separator, const std::string& labelMapFile)
             : dimension_(dimension), labelCol_(labelCol), weightCol_(weightCol), nameCol_(nameCol), separator_(separator)
@@ -166,9 +191,9 @@ namespace MLx {
         }
     }
 
-    Example* ExampleParser::Parse(const std::string& line) {
+    Example* ExampleParser::Parse(const string& line) const {
         StrVec columns = Split(line, separator_);
-        float label = labelMap_.empty() ? stof(*columns[labelCol_]) : labelMap_[*columns[labelCol_]];
+        float label = labelMap_.empty() ? stof(*columns[labelCol_]) : labelMap_.at(*columns[labelCol_]);
         float weight = weightCol_ >= 0 ? stof(*columns[weightCol_]) : 1;
         return new Example(ParseFeatures(columns), label, weight, nameCol_ >= 0 ? move(columns[nameCol_]) : nullptr);
     }
@@ -183,7 +208,7 @@ namespace MLx {
         }
     }
 
-    Vector* DenseParser::ParseFeatures(const StrVec &columns) {
+    Vector* DenseParser::ParseFeatures(const StrVec &columns) const {
         Check<FormatException>(columns.size() > parseIndices_.back(), "Wrong number of columns");
         Vec features(dimension_);
         for (int i = 0; i < dimension_; ++i)
@@ -199,7 +224,7 @@ namespace MLx {
                 "Sparse instances require that all non-feature columns are in the front");
     }
 
-    Vector* SparseParser::ParseFeatures(const StrVec &columns) {
+    Vector* SparseParser::ParseFeatures(const StrVec &columns) const {
         size_t count = columns.size() - featureColumnOffset_;
         Check<FormatException>(0 < count && count <= dimension_, "Number of columns out of range");
 
