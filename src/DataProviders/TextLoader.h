@@ -11,8 +11,7 @@ namespace MLx {
     class TextLoader final : public StreamingExamples {
     public:
         TextLoader(const std::string& filename, const std::string& settings);
-
     protected:
-        class TextLoaderState;
+        class State;
     };
 }
