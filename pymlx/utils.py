@@ -74,6 +74,43 @@ def get_fscores(predictor, feature_names=None):
     return Series(fscores).order(ascending=False)
 
 
+def histogram(filename, cols):
+    if isinstance(cols, list):
+        with open(filename, 'rb') as f:
+            reader = csv.reader(f)
+            header = reader.next()
+            col_idx = {col: header.index(col) for col in cols}
+            histograms = {col: {} for col in cols}
+            for row in reader:
+                for col in cols:
+                    hist = histograms[col]
+                    value = row[col_idx[col]]
+                    if value in hist:
+                        hist[value] += 1
+                    else:
+                        hist[value] = 1
+        for col in cols:
+            hist = histograms[col]
+            print(col + ':')
+            for pair in sorted(hist.items(), key=lambda x: x[1], reverse=True):
+                print(' {0}\t{1}'.format(pair[0], pair[1]))
+            print
+    else:
+        col = cols
+        with open(filename, 'rb') as f:
+            reader = csv.reader(f)
+            col_id = reader.next().index(col)
+            hist = {}
+            for row in reader:
+                value = row[col_id]
+                if value in hist:
+                    hist[value] += 1
+                else:
+                    hist[value] = 1
+        for pair in sorted(hist.items(), key=lambda x: x[1], reverse=True):
+            print(' {0}\t{1}'.format(pair[0], pair[1]))
+
+
 def field_types(df):
     types = {}
     for col in df:

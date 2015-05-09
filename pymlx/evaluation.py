@@ -5,6 +5,7 @@ from sklearn import metrics as skmetrics
 from matplotlib import pyplot as plt
 from model import BinaryClassifier
 
+
 def pr_scorer(predictor, X, y):
     p = predictor.predict_proba(X)[:, 1]
     precision, recall, thresholds = skmetrics.precision_recall_curve(y, p)
@@ -65,3 +66,22 @@ def confusion_matrix(truths, predictions, sampling_rate=1):
     interact(_show_confusion_matrix,
              threshold=(0.0, 1.0, 0.01), truths=fixed(truths), predictions=fixed(predictions))
 
+
+def diagnose(model, test_df, truths, cols=None, predictions=None, good_to_bad=False, pretty=True):
+    assert isinstance(model, BinaryClassifier)
+    test_features = model.featurizer.transform(test_df)
+    if predictions is None:
+        predictions = model.bulk_predict(test_features)
+
+    df = DataFrame(test_features.todense(),
+                   columns=model.featurizer.out_feature_names,
+                   index=test_df.index)
+    status_cols = ['Labeled', 'Predicted Probability', 'diff']
+    for i, status in enumerate([truths, predictions,
+                                [abs(truths[i] - p) for i, p in enumerate(predictions)]]):
+        df[status_cols[i]] = status
+    df = df[status_cols + list(cols)].sort('diff', ascending=good_to_bad)
+    df.drop('diff', axis=1, inplace=True)
+    if pretty:
+        df.columns = [name.title().replace('_', ' ') for name in df.columns]
+    return df

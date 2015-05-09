@@ -64,6 +64,16 @@ class MapperHandler(FeaturesHandler):
         return enumerate(self._mapper(list(input_generator)))
 
 
+class OneToOneMapperHandler(FeaturesHandler):
+    def __init__(self, in_feature_name, out_feature_name, mapper):
+        self.in_feature_names = [in_feature_name]
+        self.out_feature_names = [out_feature_name]
+        self._mapper = mapper
+
+    def apply(self, input_generator):
+        yield 0, self._mapper(input_generator.next())
+
+
 class CategoricalHandler(FeaturesHandler):
     def __init__(self, in_feature_names, cats={}, preprocessor=None):
         for in_feature_name in cats:
@@ -181,3 +191,37 @@ class MinMaxNormalizer(FeaturesHandler):
     def apply(self, input_generator):
         pass
 
+
+class PredicatesHandler(FeaturesHandler):
+    """
+    The predicates handler computes predicate features
+    Those predicates are defined as normal functions in a module
+    For each predicate:
+        - The function name is treated as output feature name
+        - The function argument variables are treated as input feature names
+    """
+
+    def __init__(self, module):
+        predicates = []
+        features_set = set()
+        out_feature_names = []
+        for f in dir(module):
+            if (not isinstance(module.__dict__.get(f), types.FunctionType)) or f.startswith('_'):
+                continue  # filter out elements that are not public functions
+            predicate = module.__dict__.get(f)
+            predicates.append(predicate)
+            out_feature_names.append(f)
+            features_set |= set(predicate.func_code.co_varnames)
+        in_feature_names = list(features_set)
+        name_to_idx = {name: idx for idx, name in enumerate(in_feature_names)}
+        self._indices = [[name_to_idx[name] for name in predicate.func_code.co_varnames]
+                         for predicate in predicates]
+        self._predicates = predicates
+        self.in_feature_names = in_feature_names
+        self.out_feature_names = out_feature_names
+
+    def apply(self, input_generator):
+        values = list(input_generator)
+        indices = self._indices
+        return enumerate(predicate(*[values[j] for j in indices[i]])
+                         for i, predicate in enumerate(self._predicates))
