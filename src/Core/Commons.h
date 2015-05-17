@@ -1,3 +1,11 @@
+/*
+Authors: Kenneth Tran <one@kentran.net>
+License: BSD 3 clause
+ */
+
+//ToDo: change to precompiled headers. cmake currently doesn't support it.
+
+
 #pragma once
 
 #include <assert.h>
@@ -5,6 +13,7 @@
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -25,10 +34,14 @@ extern std::unordered_set<std::exception*> IsErrorUsage;
 namespace MLx {
     typedef std::string string;
 
-    typedef std::vector<float> Vec;
-    typedef std::vector<int> IntVec;
+    typedef std::vector<float> FloatVec;
+    typedef std::vector<size_t> IntVec;
     typedef std::vector<UREF<std::string>> StrVec;
     typedef std::vector<bool> BoolVec;
+    typedef std::vector<double> DoubleVec;
+
+    //ToDo: allow users to specify a random seed
+    extern std::mt19937 Rand;
 
     class FormatException : public std::domain_error {
     public:
@@ -50,7 +63,9 @@ namespace MLx {
                 Fail<TException>(message);
         };
 
-        void CheckArg(bool condition, const std::string &message);
+        inline void CheckArg(bool condition, const std::string &message) {
+            Check<std::invalid_argument>(condition, message);
+        }
     }
 
     namespace Utils {

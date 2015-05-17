@@ -1,15 +1,16 @@
+/*
+Authors: Kenneth Tran <one@kentran.net>
+License: BSD 3 clause
+ */
+
 #include "Commons.h"
 
 namespace MLx {
     using namespace std;
 
-    FormatException::FormatException(const string& message) : domain_error(message) {};
+    std::mt19937 Rand(1);
 
-    namespace Contracts {
-        void CheckArg(bool condition, const string &message) {
-            Check<invalid_argument>(condition, message);
-        }
-    }
+    FormatException::FormatException(const string& message) : domain_error(message) {};DfDiffpFile
 
     namespace Utils {
         using namespace Contracts;

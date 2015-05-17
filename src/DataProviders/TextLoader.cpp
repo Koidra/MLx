@@ -82,7 +82,7 @@ namespace MLx {
                 }
                 return false;
             }
-            return ++current_ <= cache_.back();
+            return ++current_ <= &(cache_.back());
         }
 
         ~State() {
@@ -157,7 +157,7 @@ namespace MLx {
         Check<domain_error>(firstInstanceColumnCount <= numCols, "Invalid data");
         isSparse_ = firstInstanceColumnCount < numCols;
 
-        size_t dimension = schema_->GetDimension();
+        size_t dimension = schema_->Dimension();
         ExampleParser* parser = isSparse_
                 ? (ExampleParser*) new SparseParser(dimension, labelCol, weightCol, nameCol, separator, labelMapFile)
                 : (ExampleParser*) new DenseParser(dimension, labelCol, weightCol, nameCol, isNonFeature, separator, labelMapFile);
@@ -223,7 +223,7 @@ namespace MLx {
 
     Vector* DenseParser::ParseFeatures(const StrVec &columns) const {
         Check<FormatException>(columns.size() > parseIndices_.back(), "Wrong number of columns");
-        Vec features(dimension_);
+        FloatVec features(dimension_);
         for (int i = 0; i < dimension_; ++i)
             features[i] = stof(*columns[parseIndices_[i]]);
         return new DenseVector(features);
@@ -242,7 +242,7 @@ namespace MLx {
         Check<FormatException>(0 < count && count <= dimension_, "Number of columns out of range");
 
         IntVec indices(count);
-        Vec values(count);
+        FloatVec values(count);
         size_t offset = featureColumnOffset_;
         int lastIndex = -1;
         for (size_t i = 0, j = offset; i < count; i++, j++)
