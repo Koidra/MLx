@@ -3,8 +3,8 @@ from utils import *
 from features_handler import *
 
 class TestMLx(unittest.TestCase):
-    def __init__(self):
-        self.train_df, self.train_labels = load_data('../samples/census_income.train.csv',
+    def setUp(self):
+        self.train_df, self.train_labels = load_data('../data/census_income.train.csv',
                                                      label_col='Label')
 
     def test_QuantileNormalizer(self):
