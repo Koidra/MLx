@@ -1,32 +1,45 @@
+import random
 from numpy import array, float32
 from pandas import DataFrame
 from scipy.sparse import csr_matrix
-
+from features_handler import FeaturesHandler
 
 class Featurizer:
     def __init__(self, handlers):
-        self._handlers = handlers
+        assert isinstance(handlers, list)
+        for handler in handlers:
+            assert isinstance(handler, FeaturesHandler)
+        self.handlers = handlers
+        self.in_feature_names = None
+        self.out_feature_names = None
+        self._handlers_feature_indices = None
+
+    # Contracts: df must contain only feature columns
+    def learn(self, df, sample_size=100000):
         self._handlers_feature_indices = []  # indices of the input features for each handler
         self.in_feature_names = []
         self.out_feature_names = []
 
-    # Contracts: df must contain only feature columns
-    def learn(self, df):
+        if len(df) > sample_size:
+            df = df.ix[random.sample(df.index, sample_size)]
+
         self.in_feature_names = list(df.columns)
         name_to_index = {name: i for i, name in enumerate(df.columns)}
-        for handler in self._handlers:
+        for handler in self.handlers:
             handler.learn(df)
             self._handlers_feature_indices.append([name_to_index[name]
                                                    for name in handler.in_feature_names])
             self.out_feature_names.extend(handler.out_feature_names)
 
+    # Note that we pass through NaNs
+    # So either the handlers or the learner needs to handle NaNs
+    # The featurizer itself doesn't handle NaNs
     def _build_features(self, record, builder):
         offset = 0
-        for h, handler in enumerate(self._handlers):
+        for h, handler in enumerate(self.handlers):
             feature_indices = self._handlers_feature_indices[h]
             for index, value in handler.apply(record[i] for i in feature_indices):
-                # Note: we don't check (not value) because value could be None, nan, or np.nan
-                if value < 0 or value > 0:
+                if value:
                     builder(offset + index, value)
             offset += handler.size()
 
@@ -55,12 +68,10 @@ class Featurizer:
             return indices, values
 
     # Note: df cannot contain the label column
-    def transform(self, df, train=False, sparse=True):
-        """
-        @type df: DataFrame
-        """
-        if train:
-            self.learn(df)
+    def transform(self, df, sparse=True, learn=False, learning_sample_size=100000):
+        assert isinstance(df, DataFrame)
+        if learn:
+            self.learn(df, learning_sample_size)
 
         features = df.values
         if sparse:
@@ -82,6 +93,6 @@ class Featurizer:
 
     def get_active_features(self):
         features_set = set()
-        for handler in self._handlers:
+        for handler in self.handlers:
             features_set |= set(handler.in_feature_names)
         return sorted(features_set)

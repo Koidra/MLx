@@ -1,7 +1,10 @@
+import numpy
 import types
 import contracts
 from abc import ABCMeta, abstractmethod
 from bisect import bisect_left
+from collections import Counter
+from pandas import DataFrame
 
 
 class FeaturesHandler(object):
@@ -15,30 +18,36 @@ class FeaturesHandler(object):
         return len(self.out_feature_names)
 
     @abstractmethod
-    def apply(self, values):
+    def apply(self, input_generator):
         """
-        :param values: sequence of feature values corresponding to in_feature_names
+        :param input_generator: sequence of feature values corresponding to in_feature_names
         :return sequence of (index,value)
         """
-        pass
+        return enumerate(input_generator)
 
     def learn(self, df):
         """
         Train the handler from data
         :param df: data frame
         """
-        pass
+        assert isinstance(df, DataFrame)
 
 
 class NoHandler(FeaturesHandler):
     def __init__(self, in_feature_names):
-        super(self.__class__, self).__init__(in_feature_names)
+        super(NoHandler, self).__init__(in_feature_names)
         self.out_feature_names = in_feature_names
 
-    def apply(self, values):
+    def apply(self, input_generator):
         #ToDo: handle nan values
         #They are currently passed through as None/nan and will be treated as 0 by the featurizer
-        return enumerate(values)
+        return enumerate(input_generator)
+
+
+class BoolHandler(NoHandler):
+    """
+    This is nothing but a NoHandler with a different name
+    """
 
 
 # Mapper handler maps input features to output features via a function (e.g. a lambda)
@@ -53,8 +62,8 @@ class MapperHandler(FeaturesHandler):
         self.out_feature_names = out_feature_names
         self._mapper = mapper
 
-    def apply(self, values):
-        return enumerate(self._mapper(list(values)))
+    def apply(self, input_generator):
+        return enumerate(self._mapper(list(input_generator)))
 
 
 class OneToOneMapperHandler(FeaturesHandler):
@@ -63,8 +72,8 @@ class OneToOneMapperHandler(FeaturesHandler):
         self.out_feature_names = [out_feature_name]
         self._mapper = mapper
 
-    def apply(self, values_generator):
-        yield 0, self._mapper(values_generator.next())
+    def apply(self, input_generator):
+        yield 0, self._mapper(input_generator.next())
 
 
 class CategoricalHandler(FeaturesHandler):
@@ -106,16 +115,15 @@ class CategoricalHandler(FeaturesHandler):
                     self._count += 1
             maps[i] = _map
 
-    def apply(self, values):
+    def apply(self, input_generator):
         preprocessor = self._preprocessor
-        for i, value in enumerate(values):
+        for i, value in enumerate(input_generator):
             index = self._maps[i].get(preprocessor(value))
             if index is not None:
                 yield index, 1
 
-# Can also be called BinNormalizer
-class QuantileNormalizer(FeaturesHandler):
-    def __init__(self, in_feature_names, n_bins=16, thresholds_groups=None):
+class BinNormalizer(FeaturesHandler):
+    def __init__(self, in_feature_names, n_bins=32, thresholds_groups=None):
         """
         :param in_feature_names: names of input features
         :param n_bins: number of bins for each input feature
@@ -125,7 +133,7 @@ class QuantileNormalizer(FeaturesHandler):
             If provided, n_bins will be ignored.
         """
         super(self.__class__, self).__init__(in_feature_names)
-        self.out_feature_names = [name + '_binned' for name in in_feature_names]
+        self.out_feature_names = [name + '_bin' for name in in_feature_names]
         contracts.check(thresholds_groups is None
                         or (len(thresholds_groups) == len(in_feature_names) and n_bins > 1))
         self._threshold_groups = thresholds_groups
@@ -137,41 +145,52 @@ class QuantileNormalizer(FeaturesHandler):
 
         self._threshold_groups = []
         for col in self.in_feature_names:
-            histogram = {}
-            for value in df[col]:
-                if value in histogram:
-                    histogram[value] += 1
-                else:
-                    histogram[value] = 1
-            histogram = [(value, histogram[value]) for value in sorted(histogram)]
-
+            f_values = df[col].dropna()
+            assert numpy.issubdtype(f_values, numpy.number)
+            histogram = sorted(Counter(f_values).items())
             if len(histogram) <= self._n_bins:
-                thresholds = [(histogram[i][0] + histogram[i+1][0])/2
-                              for i in range(0,len(histogram)-1)]
-            else:
-                thresholds = []
-                n_bins = self._n_bins
-                n_items = float(len(df))
-                ih = 0
-                while n_bins > 1:
-                    expected_bin_size = n_items / n_bins
-                    count = 0
-                    while count < expected_bin_size:
-                        count += histogram[ih][1]
-                        ih += 1
-                    last_addition = histogram[ih-1][1]
-                    if count - expected_bin_size > expected_bin_size - (count - last_addition) \
-                            and count != last_addition:
-                        ih -= 1
-                        count -= last_addition
-                    thresholds.append((histogram[ih-1][0] + histogram[ih][0])/2)
-                    n_items -= count
-                    n_bins -= 1
+                self._threshold_groups.append(None)
+                continue
+
+            thresholds = []
+            n_bins = self._n_bins
+            n_items = float(len(f_values))
+            ih = 0
+            ih_lim = len(histogram)
+            while n_bins > 1:
+                expected_bin_size = n_items / n_bins
+                count = 0
+                while count < expected_bin_size:
+                    count += histogram[ih][1]
+                    ih += 1
+                last_addition = histogram[ih-1][1]
+                if count - expected_bin_size > expected_bin_size - (count - last_addition) \
+                        and count != last_addition:
+                    ih -= 1
+                    count -= last_addition
+                if ih == ih_lim:  # reaching the end before fulfilling the number of bins
+                    break
+                thresholds.append((histogram[ih-1][0] + histogram[ih][0])/2)
+                n_items -= count
+                n_bins -= 1
             self._threshold_groups.append(thresholds)
 
-    def apply(self, values):
-        return ((i, bisect_left(self._threshold_groups[i], value))
-                for i, value in enumerate(values))
+    def apply(self, input_generator):
+        for i, value in enumerate(input_generator):
+            thresholds = self._threshold_groups[i]
+            yield i, (bisect_left(thresholds, value) if thresholds else value)
+
+
+class MinMaxNormalizer(FeaturesHandler):
+    def __init__(self, in_feature_names):
+        super(MinMaxNormalizer, self).__init__(in_feature_names)
+        raise RuntimeError('Not yet implemented')
+
+    def learn(self, df):
+        pass
+
+    def apply(self, input_generator):
+        pass
 
 
 class PredicatesHandler(FeaturesHandler):
@@ -202,8 +221,8 @@ class PredicatesHandler(FeaturesHandler):
         self.in_feature_names = in_feature_names
         self.out_feature_names = out_feature_names
 
-    def apply(self, values_generator):
-        values = list(values_generator)
+    def apply(self, input_generator):
+        values = list(input_generator)
         indices = self._indices
         return enumerate(predicate(*[values[j] for j in indices[i]])
                          for i, predicate in enumerate(self._predicates))
