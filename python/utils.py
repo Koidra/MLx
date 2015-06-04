@@ -1,22 +1,24 @@
 import csv
 import random
 import pandas
-from pandas import DataFrame, Series, read_csv
+from time import time
+from pandas import Series, read_csv
 from sklearn import metrics as skmetrics
-from sklearn.grid_search import RandomizedSearchCV
 from matplotlib import pyplot as plt
+from sklearn.grid_search import RandomizedSearchCV
 from IPython.display import display
 from features_handler import *
 from featurizer import Featurizer
 from composition_handler import CompositionHandler
 
-#### Core Utils ####
+# Core Utils #
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
 
-##### Data Ingestion #####
+
+# Data Ingestion Utils #
 def load_data(filename, label_col, id_col=None, feature_cols=None, excluded_cols=None, nrows=None):
     if feature_cols is not None and excluded_cols is not None:
         raise ValueError('Either feature_cols or excluded_columns must be None.')
@@ -29,16 +31,15 @@ def load_data(filename, label_col, id_col=None, feature_cols=None, excluded_cols
     df.drop([label_col] + (excluded_cols if excluded_cols else []), axis=1, inplace=True)
     return df, labels
 
-
-##### Exploration #####
-
-def suggest_handlers(df, sample_size = 10000, trees_optimized=True, hinted_featurizer=None):
+# Features Engineering Utils #
+def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featurizer=None):
     """
     Suggest handlers given the data
     :param df: DataFrame
     :param trees_optimized: if true, the handlers are suggested to optimize trees learning
      Otherwise, they are suggested for other learners (e.g. linear or NN)
     """
+    assert isinstance(df, DataFrame)
     if len(df) > sample_size:
         df = df.ix[random.sample(df.index, sample_size)]
 
@@ -65,8 +66,7 @@ def suggest_handlers(df, sample_size = 10000, trees_optimized=True, hinted_featu
         if col in priors:
             continue
 
-        dtype = Counter(type(value) for value in df[col]
-                        if not (value != value)).most_common()[0][0]
+        dtype = Counter(type(value) for value in df[col] if (value == value)).most_common(1)[0][0]
         if dtype == bool:
             kind = BoolHandler
             if df[col].dtype != object:
@@ -133,18 +133,25 @@ def suggest_handlers(df, sample_size = 10000, trees_optimized=True, hinted_featu
 
     return ret
 
+# Parameter Sweep Utils #
+def pr_scorer(predictor, X, y):
+    p = predictor.predict_proba(X)[:, 1]
+    precision, recall, thresholds = skmetrics.precision_recall_curve(y, p)
+    return skmetrics.auc(recall, precision)
 
-def random_sweep(X, y, model, params, n_iter, scoring='roc_auc', cv=3,
+
+def random_sweep(X, y, model, params, n_iter=20, scoring='roc_auc', cv=3,
                  refit=False, n_jobs=1, verbose=2):
     sweeper = RandomizedSearchCV(model, params, scoring=scoring, n_iter=n_iter,
                                  cv=cv, refit=refit, n_jobs=n_jobs, verbose=verbose)
     sweeper.fit(X, y)
     return sweeper
 
-def sweep_stats(sweeper, low_is_good=False):
+
+def sweep_stats(sweeper, high_is_good=True, save=None):
     stats = []
     for row in sorted(sweeper.grid_scores_,
-                      key=lambda x: x.mean_validation_score, reverse=low_is_good):
+                      key=lambda x: x.mean_validation_score, reverse=high_is_good):
         stat = {'Score': row.mean_validation_score, 'Std': row.cv_validation_scores.std()}
         parameters = row.parameters
         for param in parameters:
@@ -152,18 +159,22 @@ def sweep_stats(sweeper, low_is_good=False):
         stats.append(stat)
     return DataFrame(stats)
 
+
 def get_fscores(predictor, feature_names=None):
-        fscores = predictor.booster().get_fscore()
-        if feature_names is not None:
-            fscores = {feature_names[int(f[1:])]: fscores[f] for f in fscores}
-        return Series(fscores).order(ascending=False)
+    fscores = predictor.booster().get_fscore()
+    if feature_names is not None:
+        fscores = {feature_names[int(f[1:])]: fscores[f] for f in fscores}
+    return Series(fscores).order(ascending=False)
+
 
 def log_loss(truths, predictions):
     return [- (truths[i] * numpy.log(p) + (1 - truths[i]) * numpy.log(1 - p))
             for i, p in enumerate(predictions)]
 
+
 def diagnose(model, test_df, truths, cols=None, predictions=None, good_to_bad=False, pretty=True):
     import MLx
+
     assert isinstance(model, MLx.BinaryClassifier)
     test_features = model.featurizer.transform(test_df)
     if predictions is None:
@@ -172,7 +183,7 @@ def diagnose(model, test_df, truths, cols=None, predictions=None, good_to_bad=Fa
     df = DataFrame(test_features.todense(),
                    columns=model.featurizer.out_feature_names,
                    index=test_df.index)
-    status_cols = ['Truth', 'Predicted Probability', 'Log Loss']
+    status_cols = ['Labeled', 'Predicted Probability', 'Log Loss']
     for i, status in enumerate([truths, predictions, log_loss(truths, predictions)]):
         df[status_cols[i]] = status
     df = df[status_cols + list(cols)].sort('Log Loss', ascending=good_to_bad)
@@ -180,45 +191,51 @@ def diagnose(model, test_df, truths, cols=None, predictions=None, good_to_bad=Fa
         df.columns = [name.title().replace('_', ' ') for name in df.columns]
     return df
 
+
 def _plot_curve(x, y, title, x_label, y_label):
     plt.plot(x, y)
     plt.title('{0} Curve (AUC = {1:.2f})'.format(title, skmetrics.auc(x, y)))
     plt.xlabel(x_label)
     plt.ylabel(y_label)
 
+
 def plot_roc_pr(truths, predictions):
     plt.rcParams['figure.figsize'] = 10, 4
     fpr, tpr, thresholds = skmetrics.roc_curve(truths, predictions)
-    plt.subplot(1,2,1)
+    plt.subplot(1, 2, 1)
     _plot_curve(fpr, tpr, 'ROC', 'False positive rate', 'True positive rate')
-    plt.subplot(1,2,2)
+    plt.subplot(1, 2, 2)
     precision, recall, thresholds = skmetrics.precision_recall_curve(truths, predictions)
-    precision, recall = zip(*sorted(zip(precision, recall)))
-    _plot_curve(precision, recall, 'PR', 'Precision', 'Recall')
+    _plot_curve(recall, precision, 'PR', 'Recall', 'Precision')
     plt.tight_layout(w_pad=4)
+
 
 def _show_confusion_matrix(truths, predictions, threshold):
     matrix = skmetrics.confusion_matrix(truths, [prob > threshold for prob in predictions])
-    tn = matrix[0,0]
-    fp = matrix[0,1]
-    fn = matrix[1,0]
-    tp = matrix[1,1]
+    tn = matrix[0, 0]
+    fp = matrix[0, 1]
+    fn = matrix[1, 0]
+    tp = matrix[1, 1]
     print('                 PREDICTED            Recall')
     print('         ======F=============T======')
     print('         |            |            |')
-    print('         F{0:10}  |{1:10}  |  N: {2:.2f}%'.format(tn, fp, float(tn)/(tn+fp)*100))
+    print('         F{0:10}  |{1:10}  |  N: {2:.2f}%'.format(tn, fp, float(tn) / (tn + fp) * 100))
     print('         |            |            |')
-    print('TRUTH    |-------------------------|')
+    print('LABELED  |-------------------------|')
     print('         |            |            |')
-    print('         T{0:10}  |{1:10}  |  P: {2:.2f}%'.format(fn, tp, float(tp)/(fn+tp)*100))
+    print('         T{0:10}  |{1:10}  |  P: {2:.2f}%'.format(fn, tp, float(tp) / (fn + tp) * 100))
     print('         |            |            |')
     print('         ===========================')
-    print('Precision   N: {0:.2f}%     P: {1:.2f}%'.format(float(tn)/(tn + fn)*100, float(tp)/(fp+tp)*100))
+    print('Precision   N: {0:.2f}%     P: {1:.2f}%'.format(float(tn) / (tn + fn) * 100,
+                                                           float(tp) / (fp + tp) * 100))
+
 
 def confusion_matrix(truths, predictions):
     from IPython.html.widgets import interact, fixed
+
     interact(_show_confusion_matrix,
              threshold=(0.0, 1.0, 0.05), truths=fixed(truths), predictions=fixed(predictions))
+
 
 def histogram(filename, cols):
     if isinstance(cols, list):
@@ -256,6 +273,7 @@ def histogram(filename, cols):
         for pair in sorted(hist.items(), key=lambda x: x[1], reverse=True):
             print(' {0}\t{1}'.format(pair[0], pair[1]))
 
+
 def field_types(df):
     types = {}
     for col in df:
@@ -265,3 +283,20 @@ def field_types(df):
         else:
             types[t] = [col]
     return types
+
+
+_start_time = None
+_elapsed = None
+_time_unit_conversion = {'hour': 3600, 'minute': 60, 'second': 1}
+
+
+def start_timing():
+    global _start_time
+    _start_time = time()
+
+
+def report_timing(unit='minute', fresh=True):
+    global _elapsed
+    if fresh:
+        _elapsed = time() - _start_time
+    print('Elapsed: {0:.2g} {1}s'.format(_elapsed / _time_unit_conversion[unit], unit))

@@ -39,8 +39,6 @@ class NoHandler(FeaturesHandler):
         self.out_feature_names = in_feature_names
 
     def apply(self, input_generator):
-        #ToDo: handle nan values
-        #They are currently passed through as None/nan and will be treated as 0 by the featurizer
         return enumerate(input_generator)
 
 
