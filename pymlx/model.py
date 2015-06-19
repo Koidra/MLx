@@ -6,8 +6,8 @@ from pandas import DataFrame, Series
 import dill
 from numpy import float32
 from scipy.sparse import csr_matrix
-from xgboost import XGBModel
-from featurizer import Featurizer
+from .xgboost import XGBModel
+from .featurizer import Featurizer
 
 
 class BinaryClassifier:

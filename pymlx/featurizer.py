@@ -3,8 +3,8 @@ import numpy as np
 import pandas
 from pandas import Series, read_csv
 from scipy.sparse import csr_matrix
-from core import *
-from features_handler import *
+from .core import *
+from .features_handler import *
 
 
 class Featurizer:
@@ -62,7 +62,7 @@ class Featurizer:
             df = data
 
         if sample_size and len(df) > sample_size:
-            df = df.ix[random.sample(df.index, sample_size)]
+            df = df.ix[random.sample(list(df.index), sample_size)]
 
         # REVIEW: read_csv() doesn't honor the order of the input column names
         # So we need to re-order in_feature_names to make it consistent with the data order
@@ -155,7 +155,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
 
     assert isinstance(df, DataFrame)
     if len(df) > sample_size:
-        df = df.ix[random.sample(df.index, sample_size)]
+        df = df.ix[random.sample(list(df.index), sample_size)]
 
     CAT_INT = 'NEED REVIEW: could be either CategoricalHandler or a numeric handler'
     NA = 'Too difficult to tell'
@@ -234,7 +234,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
             print(kind)
             if set(desc.index) != set(cols):
                 print('Outlier columns: {0}'.format(sorted(set(cols) - set(desc.index))))
-            samples = df_sub.ix[random.sample(df_sub.index, 5)]
+            samples = df_sub.ix[random.sample(list(df_sub.index), 5)]
             desc['Sample values'] = Series(
                 [', '.join(('{:.2g}' if isinstance(val, float) else '{:}')
                            .format(val) for val in samples[col])

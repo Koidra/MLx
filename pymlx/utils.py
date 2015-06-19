@@ -1,8 +1,8 @@
 import csv
 from time import time
 from pandas import Series, read_csv
-from features_handler import *
-from featurizer import Featurizer
+from .features_handler import *
+from .featurizer import Featurizer
 
 # Data Ingestion Utils #
 def load_data(filename, label_col=None, id_col=None, feature_cols=None, excluded_cols=None,

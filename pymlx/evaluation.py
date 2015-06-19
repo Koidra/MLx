@@ -3,7 +3,7 @@ import numpy
 from pandas import DataFrame
 from sklearn import metrics as skmetrics
 from matplotlib import pyplot as plt
-from model import BinaryClassifier
+from .model import BinaryClassifier
 
 
 def pr_scorer(predictor, X, y):

@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from bisect import bisect_left
 from collections import Counter
 from pandas import DataFrame
-from core import check
+from .core import check
 
 
 class FeaturesHandler(object):
