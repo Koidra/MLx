@@ -54,8 +54,9 @@ def _show_confusion_matrix(truths, predictions, threshold):
     print('Precision   N: {0:.2f}%     P: {1:.2f}%'.format(float(tn) / (tn + fn) * 100,
                                                            float(tp) / (fp + tp) * 100))
 
+
 def confusion_matrix(truths, predictions, sampling_rate=1):
-    from IPython.html.widgets import interact, fixed
+    from ipywidgets import interact, fixed
     assert len(truths) == len(predictions)
     if sampling_rate < 1:
         n = len(truths)
@@ -80,7 +81,7 @@ def diagnose(model, test_df, truths, cols=None, predictions=None, good_to_bad=Fa
     for i, status in enumerate([truths, predictions,
                                 [abs(truths[i] - p) for i, p in enumerate(predictions)]]):
         df[status_cols[i]] = status
-    df = df[status_cols + list(cols)].sort('diff', ascending=good_to_bad)
+    df = df[status_cols + list(cols)].sort_values('diff', ascending=good_to_bad)
     df.drop('diff', axis=1, inplace=True)
     if pretty:
         df.columns = [name.title().replace('_', ' ') for name in df.columns]

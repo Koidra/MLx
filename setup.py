@@ -7,7 +7,6 @@ with open('README.md') as file:
 setup(
     name='pymlx',
     packages=['pymlx'],
-    package_data={'pymlx': ['*.so']},
     version='0.0.8',
     description='Yet another machine learning framework',
     long_description=long_description,
@@ -21,8 +20,10 @@ setup(
         'scipy>=0.14.0',
         'pandas>=0.15.0',
         'scikit_learn>=0.16',
+        'xgboost',
         'matplotlib>=1.4.3',
-        'dill>=0.2.2'],
+        'dill>=0.2.2',
+        'ipywidgets'],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

@@ -6,3 +6,5 @@
 # Binaries
 *.o
 *.a
+
+build/

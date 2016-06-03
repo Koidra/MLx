@@ -6,7 +6,7 @@ from pandas import DataFrame, Series
 import dill
 from numpy import float32
 from scipy.sparse import csr_matrix
-from .xgboost import XGBModel
+from xgboost import XGBModel
 from .featurizer import Featurizer
 
 
@@ -55,7 +55,7 @@ class BinaryClassifier:
         feature_names = self.featurizer.out_feature_names
         fscores = self.predictor.booster().get_fscore()
         fscores = {feature_names[int(f[1:])]: fscores[f] for f in fscores}
-        return Series(fscores).order(ascending=False)
+        return Series(fscores).sort_values(ascending=False)
 
 
 def load(filename):
