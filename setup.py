@@ -7,7 +7,7 @@ with open('README.md') as file:
 setup(
     name='pymlx',
     packages=['pymlx'],
-    version='0.0.8',
+    version='0.0.9',
     description='Yet another machine learning framework',
     long_description=long_description,
     author='Kenneth Tran',

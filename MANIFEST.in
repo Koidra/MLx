@@ -1,2 +1,1 @@
-include pymlx/*.so
 include README.md
