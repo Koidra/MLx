@@ -1,6 +1,7 @@
 from pandas import DataFrame
 from sklearn.grid_search import RandomizedSearchCV
 
+
 def random_sweep(X, y, model, params, n_iter=20, scoring='roc_auc', cv=3,
                  refit=False, n_jobs=1, verbose=2):
     sweeper = RandomizedSearchCV(model, params, scoring=scoring, n_iter=n_iter,
@@ -8,7 +9,8 @@ def random_sweep(X, y, model, params, n_iter=20, scoring='roc_auc', cv=3,
     sweeper.fit(X, y)  # run the random search, not fitting the model
     return sweeper
 
-def sweep_stats(sweeper, high_is_good=True, save=None):
+
+def sweep_stats(sweeper, high_is_good=True):
     stats = []
     for row in sorted(sweeper.grid_scores_,
                       key=lambda x: x.mean_validation_score, reverse=high_is_good):
@@ -18,4 +20,3 @@ def sweep_stats(sweeper, high_is_good=True, save=None):
             stat[param] = parameters[param]
         stats.append(stat)
     return DataFrame(stats)
-
