@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import pandas
+from typing import Union, List
 from pandas import Series, read_csv
 from scipy.sparse import csr_matrix
 from .core import *
@@ -22,7 +23,7 @@ class Featurizer:
 
         dtype = np.float32
         if sparse:
-            self._features_ctor = lambda: ([], [])  # ctor for a features vector
+            self._initialize_features_vector = lambda: ([], [])  # ctor for a features vector
             self.init_data = lambda: ([], [], [0])  # ctor for the features matrix
             self.to_matrix = lambda X: csr_matrix(X, shape=(len(X[2]) - 1, self.size()),
                                                   dtype=dtype)
@@ -37,7 +38,7 @@ class Featurizer:
                 data[2].append(len(data[0]))  # ind_ptr
 
         else:
-            self._features_ctor = None  # for dense, need size() first
+            self._initialize_features_vector = None  # for dense, need size() first
             self.init_data = lambda: []
             self.to_matrix = lambda X: np.array(X, dtype=dtype)
 
@@ -85,13 +86,13 @@ class Featurizer:
                                                    for name in handler.in_feature_names])
             self.out_feature_names.extend(handler.out_feature_names)
 
-        self._features_ctor = self._features_ctor or (lambda: [0] * self.size())
+        self._initialize_features_vector = self._initialize_features_vector or (lambda: [0] * self.size())
 
     # Note that we pass through NaNs
     # So either the handlers or the learner needs to handle NaNs
     # The featurizer itself doesn't handle NaNs
-    def extract_features(self, raw_features):
-        features = self._features_ctor()
+    def extract_features(self, raw_features: List):
+        features = self._initialize_features_vector()
         add_feature = self._add_feature
         offset = 0
         for h, handler in enumerate(self.handlers):
@@ -115,17 +116,18 @@ class Featurizer:
 
 
 class CompositionHandler(FeaturesHandler):
-    def __init__(self, handler1, handler2):
-        assert isinstance(handler2, FeaturesHandler)
-        if isinstance(handler1, list):
-            for handler in handler1:
+    def __init__(self, preprocessors: Union[FeaturesHandler, List[FeaturesHandler]], postprocessor: FeaturesHandler,
+                 in_feature_names):
+        super().__init__(in_feature_names)
+        if isinstance(preprocessors, list):
+            for handler in preprocessors:
                 assert isinstance(handler, FeaturesHandler)
         else:
-            assert isinstance(handler1, FeaturesHandler)
-            handler1 = [handler1]
-        self._preprocessor = Featurizer(handler1, sparse=False)
-        self._postprocessor = handler2
-        self._intermediate_dimension = len(handler2.in_feature_names)
+            assert isinstance(preprocessors, FeaturesHandler)
+            preprocessors = [preprocessors]
+        self._preprocessor = Featurizer(preprocessors, sparse=False)
+        self._postprocessor = postprocessor
+        self._intermediate_dimension = len(postprocessor.in_feature_names)
         self.in_feature_names = sorted(set().union(*[handler.in_feature_names
                                                      for handler in self._preprocessor.handlers]))
 
@@ -134,9 +136,8 @@ class CompositionHandler(FeaturesHandler):
         postprocessor = self._postprocessor
         df_sub = df[self.in_feature_names]
         preprocessor.learn(df_sub)
-        assert preprocessor.out_feature_names == postprocessor.in_feature_names
-        intermediates = preprocessor.transform(df_sub)
-        postprocessor.learn(DataFrame(intermediates, columns=postprocessor.in_feature_names))
+        intermediates = DataFrame(preprocessor.transform(df_sub), columns=preprocessor.out_feature_names)
+        postprocessor.learn(intermediates)
         self.out_feature_names = postprocessor.out_feature_names
 
     def apply(self, input_generator):
@@ -166,7 +167,6 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
     handlers = {kind: [] for kind in kinds}
     priors = set()
     if hinted_featurizer:
-        assert isinstance(hinted_featurizer, Featurizer)
         for handler in hinted_featurizer.handlers:
             for col in handler.in_feature_names:
                 kind = handler.__class__
