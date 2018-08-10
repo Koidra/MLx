@@ -1,32 +1,31 @@
 import random
 import numpy as np
-import pandas
+import pandas as pd
 from typing import Union, List
-from pandas import Series, read_csv
 from scipy.sparse import csr_matrix
 from .core import *
 from .features_handler import *
 
 
 class Featurizer:
-    def __init__(self, handlers, sparse=True):
+    def __init__(self, handlers: List[FeaturesHandler], sparse=False):
         assert isinstance(handlers, list)
         in_feature_names = set()
         for handler in handlers:
-            assert isinstance(handler, FeaturesHandler)
             in_feature_names |= set(handler.in_feature_names)
         self.handlers = handlers
         self.in_feature_names = sorted(in_feature_names)
         self.in_feature_types = None
         self.out_feature_names = None
-        self._handlers_feature_indices = None
 
-        dtype = np.float32
+        self._handlers_feature_indices = None
+        self._initialize_features_vector = None
+        self._sparse = sparse
+
+        DTYPE = np.float32
         if sparse:
-            self._initialize_features_vector = lambda: ([], [])  # ctor for a features vector
-            self.init_data = lambda: ([], [], [0])  # ctor for the features matrix
             self.to_matrix = lambda X: csr_matrix(X, shape=(len(X[2]) - 1, self.size()),
-                                                  dtype=dtype)
+                                                  dtype=DTYPE)
 
             def add_feature(features, i, v):  # add one feature to a feature vector
                 features[0].append(i)
@@ -38,9 +37,7 @@ class Featurizer:
                 data[2].append(len(data[0]))  # ind_ptr
 
         else:
-            self._initialize_features_vector = None  # for dense, need size() first
-            self.init_data = lambda: []
-            self.to_matrix = lambda X: np.array(X, dtype=dtype)
+            self.to_matrix = lambda X: np.array(X, dtype=DTYPE)
 
             def add_feature(features, i, v):
                 features[i] = v
@@ -54,20 +51,18 @@ class Featurizer:
     def size(self):
         return len(self.out_feature_names)
 
-    # Contracts: df must contain only feature columns
-    def learn(self, data, sample_size=None):
+    def learn(self, data: Union[str, DataFrame], sample_size: int=None):
         if isinstance(data, str):
-            df = read_csv(data, usecols=self.in_feature_names)
+            df = pd.read_csv(data, usecols=self.in_feature_names)
+            # read_csv() doesn't honor the order of the input column names
+            # So we need to re-order in_feature_names to make it consistent with the data order
+            self.in_feature_names = list(df.columns)
         else:
-            assert isinstance(data, DataFrame)
-            df = data
+            df = data[self.in_feature_names]
 
         if sample_size and len(df) > sample_size:
             df = df.ix[random.sample(list(df.index), sample_size)]
 
-        # REVIEW: read_csv() doesn't honor the order of the input column names
-        # So we need to re-order in_feature_names to make it consistent with the data order
-        self.in_feature_names = list(df.columns)
         self.in_feature_types = []
         name_to_index = {}
         for i, col in enumerate(df):
@@ -86,33 +81,27 @@ class Featurizer:
                                                    for name in handler.in_feature_names])
             self.out_feature_names.extend(handler.out_feature_names)
 
-        self._initialize_features_vector = self._initialize_features_vector or (lambda: [0] * self.size())
+        self._initialize_features_vector = lambda: ([], []) if self._sparse else (lambda: [0] * self.size())
 
     # Note that we pass through NaNs
     # So either the handlers or the learner needs to handle NaNs
     # The featurizer itself doesn't handle NaNs
-    def extract_features(self, raw_features: List):
+    def featurize_row(self, row_raw: List):
         features = self._initialize_features_vector()
         add_feature = self._add_feature
         offset = 0
         for h, handler in enumerate(self.handlers):
             feature_indices = self._handlers_feature_indices[h]
-            for index, value in handler.apply(raw_features[i] for i in feature_indices):
+            for index, value in handler.apply(row_raw[i] for i in feature_indices):
                 if value:
                     add_feature(features, offset + index, value)
             offset += handler.size()
         return features
 
-    def add_features(self, data, raw_features):
-        self._add_features(data, self.extract_features(raw_features))
-
     # Note: df cannot contain the label column
-    def transform(self, df):
-        assert isinstance(df, DataFrame)
-        data = self.init_data()
-        for row in df.itertuples(index=False):
-            self.add_features(data, row)
-        return self.to_matrix(data)
+    def transform(self, df_raw: DataFrame):
+        transformed = df_raw.apply(self.featurize_row, axis=1)
+        return NotImplemented if self._sparse else transformed.values
 
 
 class CompositionHandler(FeaturesHandler):
@@ -142,7 +131,7 @@ class CompositionHandler(FeaturesHandler):
 
     def apply(self, input_generator):
         return self._postprocessor.apply(
-            self._preprocessor.extract_features(list(input_generator)))
+            self._preprocessor.featurize_row(list(input_generator)))
 
 
 def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featurizer=None):

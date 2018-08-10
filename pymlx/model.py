@@ -35,7 +35,7 @@ class BinaryClassifier:
         Missing values MUST be encoded as nan, not None.
         :return: probability of the instance classified as True
         """
-        indices, values = self.featurizer.extract_features(features)
+        indices, values = self.featurizer.featurize_row(features)
         features = csr_matrix((values, indices, [0, len(values)]),
                               shape=(1, self._num_features),
                               dtype=float32)
