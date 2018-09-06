@@ -4,3 +4,5 @@ pandas>=0.15.0
 scikit_learn>=0.15.0
 matplotlib>=1.4.3
 dill>=0.2.2
+lightgbm
+xgboost

@@ -1,6 +1,8 @@
 import random
 import numpy as np
 import pandas as pd
+import pandas
+from pandas import Series
 from typing import Union, List
 from scipy.sparse import csr_matrix
 from .core import *
@@ -8,7 +10,9 @@ from .features_handler import *
 
 
 class Featurizer:
+
     def __init__(self, handlers: List[FeaturesHandler], sparse=False):
+
         assert isinstance(handlers, list)
         in_feature_names = set()
         for handler in handlers:
@@ -81,7 +85,7 @@ class Featurizer:
                                                    for name in handler.in_feature_names])
             self.out_feature_names.extend(handler.out_feature_names)
 
-        self._initialize_features_vector = lambda: ([], []) if self._sparse else (lambda: [0] * self.size())
+        self._initialize_features_vector = lambda: ([], []) if self._sparse else ([0] * self.size())
 
     # Note that we pass through NaNs
     # So either the handlers or the learner needs to handle NaNs
@@ -201,8 +205,10 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
         handlers[kind].append(col)
 
     ret = AttrDict()
+    # NOTE THIS
     pandas.options.display.float_format = '{:.2g}'.format
     pandas.options.display.max_rows = 500
+
     for kind in kinds:
         if len(handlers[kind]) == 0:
             del handlers[kind]

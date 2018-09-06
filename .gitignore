@@ -3,8 +3,13 @@
 *.iml
 *.iws
 
+
+pymlx_debug.py
+
 # Binaries
 *.o
 *.a
 
 build/
+pymlx.egg-info/
+__pycache__/
