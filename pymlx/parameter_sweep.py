@@ -6,9 +6,8 @@ def random_sweep(X, y, model, params, n_iter=20, scoring='roc_auc', cv=3,
                  refit=False, n_jobs=1, verbose=2):
     sweeper = RandomizedSearchCV(model, params, scoring=scoring, n_iter=n_iter,
                                  cv=cv, refit=refit, n_jobs=n_jobs, verbose=verbose)
-    sweeper.fit(X[:, np.newaxis], y)  # run the random search, not fitting the model
+    sweeper.fit(X, y)  # run the random search, not fitting the model
     return sweeper
-
 
 def sweep_stats(sweeper, high_is_good=True):
     stats = []
