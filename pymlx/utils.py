@@ -4,6 +4,7 @@ from pandas import Series, read_csv
 from .features_handler import *
 from .featurizer import Featurizer
 
+
 # Data Ingestion Utils #
 def load_data(filename, label_col=None, id_col=None, feature_cols=None, excluded_cols=None,
               dtype=None):
@@ -29,7 +30,7 @@ def load_data(filename, label_col=None, id_col=None, feature_cols=None, excluded
         return df
 
 
-def load_featurized_data(filename, label_col, feat, in_memory=True):
+def load_featurized_data(filename, label_col, feat, in_memory=True, return_dataframe=False):
     """
     Load raw data into extracted features and labels
     Note that streaming featurization is much slower than in-memory featurization,
@@ -42,9 +43,10 @@ def load_featurized_data(filename, label_col, feat, in_memory=True):
         f_types = feat.in_feature_types
         df, labels = load_data(filename, label_col,
                                feature_cols=f_names,
-                               dtype={name: f_types[i] for i, name in enumerate(f_names)})
-        return feat.transform(df), labels
+                               dtype={name: f_types[name] for i, name in enumerate(f_names)}) # <- change to using name
+        return feat.transform(df, return_dataframe=return_dataframe), labels
     else:
+        # not tested yet
         dtypes = feat.in_feature_types
         dim = len(dtypes)
         with open(filename, 'rb') as csv_file:
@@ -65,13 +67,6 @@ def load_featurized_data(filename, label_col, feat, in_memory=True):
                 labels.append(numpy.float32(row[label_index]))
 
         return feat.to_matrix(data), labels
-
-
-def get_fscores(predictor, feature_names=None):
-    fscores = predictor.booster().get_fscore()
-    if feature_names is not None:
-        fscores = {feature_names[int(f[1:])]: fscores[f] for f in fscores}
-    return Series(fscores).order(ascending=False)
 
 
 def histogram(filename, cols):

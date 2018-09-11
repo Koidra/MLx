@@ -67,22 +67,25 @@ class Featurizer:
         if sample_size and len(df) > sample_size:
             df = df.ix[random.sample(list(df.index), sample_size)]
 
-        self.in_feature_types = []
-        name_to_index = {}
+        self.in_feature_types = {} # [] store as a dictionary
+        # name_to_index = {}
         for i, col in enumerate(df):
             dtype = Counter(type(value)
                             for value in df[col] if (value == value)).most_common(1)[0][0]
-            self.in_feature_types.append(np.float32 if dtype == np.float64
-                                         else np.int32 if dtype == np.int64 else dtype)
-            name_to_index[col] = i
+            # self.in_feature_types.append(np.float32 if dtype == np.float64
+            #                             else np.int32 if dtype == np.int64 else dtype)
+            self.in_feature_types[col] = np.float32 if dtype == np.float64 \
+                                         else np.int32 if dtype == np.int64 else dtype
+            # name_to_index[col] = i
 
         self.out_feature_names = []
         self._handlers_feature_indices = []  # indices of the input features for each handler
 
         for handler in self.handlers:
             handler.learn(df)
-            self._handlers_feature_indices.append([name_to_index[name]
-                                                   for name in handler.in_feature_names])
+            # self._handlers_feature_indices.append([name_to_index[name]
+            #                                       for name in handler.in_feature_names])
+            self._handlers_feature_indices.append([name for name in handler.in_feature_names]) # use name str instead of number
             self.out_feature_names.extend(handler.out_feature_names)
 
         self._initialize_features_vector = lambda: ([], []) if self._sparse else ([0] * self.size())
@@ -91,21 +94,30 @@ class Featurizer:
     # So either the handlers or the learner needs to handle NaNs
     # The featurizer itself doesn't handle NaNs
     def featurize_row(self, row_raw: List):
+        assert isinstance(row_raw, Series)  # this func only works when row_raw is a Series
         features = self._initialize_features_vector()
         add_feature = self._add_feature
         offset = 0
         for h, handler in enumerate(self.handlers):
-            feature_indices = self._handlers_feature_indices[h]
-            for index, value in handler.apply(row_raw[i] for i in feature_indices):
+            # feature_indices = self._handlers_feature_indices[h]
+            feature_names = self._handlers_feature_indices[h]
+            # for index, value in handler.apply([row_raw[i] for i in feature_indices]):
+            # data = row_raw['Education']
+            for index, value in handler.apply([(name, row_raw[name]) for name in feature_names]):
                 if value:
                     add_feature(features, offset + index, value)
             offset += handler.size()
         return features
 
     # Note: df cannot contain the label column
-    def transform(self, df_raw: DataFrame):
-        transformed = df_raw.apply(self.featurize_row, axis=1)
-        return NotImplemented if self._sparse else transformed.values
+    def transform(self, df_raw: DataFrame, return_dataframe=False):
+        assert isinstance(df_raw, DataFrame)
+        transformed = df_raw.apply(self.featurize_row, axis=1, raw=False)
+        if not return_dataframe:
+            return NotImplemented if self._sparse else transformed.values
+        else:
+            # return features as a dataframe
+            return NotImplemented if self._sparse else pd.DataFrame(data=transformed.values.tolist(), columns=self.out_feature_names)
 
 
 class CompositionHandler(FeaturesHandler):
@@ -154,7 +166,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
     CAT_INT = 'NEED REVIEW: could be either CategoricalHandler or a numeric handler'
     NA = 'Too difficult to tell'
     numeric_kinds = [BoolHandler, BinNormalizer, 'MinMaxNormalizer', NoHandler]
-    kinds = [CategoricalHandler, 'TextHandler'] + numeric_kinds + \
+    kinds = [OneHotHandler, 'TextHandler'] + numeric_kinds + \
             [CAT_INT, MapperHandler, CompositionHandler, PredicatesHandler, NA]
 
     handlers = {kind: [] for kind in kinds}
@@ -166,7 +178,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
                 if col not in handlers[kind]:
                     handlers[kind].append(col)
                     priors.add(col)
-                    if kind in [CategoricalHandler, BoolHandler] and df[col].dtype != object:
+                    if kind in [OneHotHandler, BoolHandler] and df[col].dtype != object:
                         df[[col]] = df[[col]].astype(object)
 
     for col in df:
@@ -181,12 +193,12 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
                 # https://github.com/pydata/pandas/issues/6625
                 df[[col]] = df[[col]].astype(object)
         elif dtype == str:
-            kind = CategoricalHandler
+            kind = OneHotHandler
             # ToDo: could also be TEXT
         elif numpy.issubdtype(dtype, numpy.integer):
             col_low = col.lower()
             if col_low.endswith('id') or col_low.endswith('code') or col_low.endswith('type'):
-                kind = CategoricalHandler
+                kind = OneHotHandler
                 df[[col]] = df[[col]].astype(str)
             elif col_low.endswith('count') or col_low.endswith('s'):
                 kind = 'numeric'
@@ -215,7 +227,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
         else:
             cols = sorted(handlers[kind])
             df_sub = df[cols]
-            if kind == CategoricalHandler or kind == BoolHandler:
+            if kind == OneHotHandler or kind == BoolHandler:
                 desc = df_sub.describe(include=[object]).transpose()
             elif kind in numeric_kinds:
                 desc = df_sub.describe(include=[numpy.number]).transpose()

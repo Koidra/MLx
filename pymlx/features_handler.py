@@ -74,14 +74,14 @@ class OneToOneMapperHandler(FeaturesHandler):
         yield 0, self._mapper(input_generator.next())
 
 
-class CategoricalHandler(FeaturesHandler):
+class OneHotHandler(FeaturesHandler):
     def __init__(self, in_feature_names, cats={}, preprocessor=None):
         for in_feature_name in cats:
             if in_feature_name not in in_feature_names:
                 raise ValueError('cats contains keys ({0}) not in feature names'.format(in_feature_name))
         super(self.__class__, self).__init__(in_feature_names)
 
-        maps = [None] * len(in_feature_names)
+        maps = {}# [None] * len(in_feature_names) -> change to dictionary
         count = 0  # total number of unique values
         out_feature_names = []
         for in_feature_name in cats:
@@ -90,7 +90,8 @@ class CategoricalHandler(FeaturesHandler):
                 _map[value] = count
                 out_feature_names.append(in_feature_name + '=' + str(value))
                 count += 1
-            maps[in_feature_names.index(in_feature_name)] = _map
+            # maps[in_feature_names.index(in_feature_name)] = _map
+            maps[in_feature_name] = _map # set to string key, no more number index
 
         self.out_feature_names = out_feature_names
         self._maps = maps
@@ -102,7 +103,8 @@ class CategoricalHandler(FeaturesHandler):
         preprocessor = self._preprocessor
         out_feature_names = self.out_feature_names
         for i, in_feature_name in enumerate(self.in_feature_names):
-            if maps[i] is not None:
+            # if maps[i] is not None:
+            if in_feature_name in maps: # if feature key is existed, ignore
                 continue
             _map = {}
             for value in df[in_feature_name]:
@@ -111,14 +113,51 @@ class CategoricalHandler(FeaturesHandler):
                     _map[value] = self._count
                     out_feature_names.append(in_feature_name + '=' + str(value))
                     self._count += 1
-            maps[i] = _map
+            # maps[i] = _map
+            maps[in_feature_name] = _map  # no more number index
 
     def apply(self, input_generator):
         preprocessor = self._preprocessor
         for i, value in enumerate(input_generator):
-            index = self._maps[i].get(preprocessor(value))
+            col, val = value
+            index = self._maps[col].get(preprocessor(val))
             if index is not None:
                 yield index, 1
+
+
+class IdEncodingHandler(FeaturesHandler):
+    """
+    Convert category to id
+    """
+    def __init__(self, in_feature_names, preprocessor=None):
+        super(self.__class__, self).__init__(in_feature_names)
+        maps = {}
+        self.out_feature_names = [name + '_ide' for name in in_feature_names] # ide = id encoding
+        self._maps = maps
+        self._count = 0
+        self._preprocessor = lambda x: x if preprocessor is None else preprocessor
+
+    def learn(self, df):
+        maps = self._maps
+        preprocessor = self._preprocessor
+        for i, in_feature_name in enumerate(self.in_feature_names):
+            _map = {}
+            for value in df[in_feature_name]:
+                value = preprocessor(value)
+                if value not in _map:
+                    _map[value] = self._count
+                    # out_feature_names.append(in_feature_name + '=' + str(value))
+                    self._count += 1
+            # maps[i] = _map
+            maps[in_feature_name] = _map # no more number index
+
+    def apply(self, input_generator):
+        preprocessor = self._preprocessor
+        for i, value in enumerate(input_generator):
+            col, val = value
+            index = self._maps[col].get(preprocessor(val))
+            if index is not None:
+                yield i, index
 
 
 class BinNormalizer(FeaturesHandler):
@@ -142,13 +181,15 @@ class BinNormalizer(FeaturesHandler):
         if self._threshold_groups is not None:
             return
 
-        self._threshold_groups = []
+        # self._threshold_groups = []
+        self._threshold_groups = {} # <- change to dict
+
         for col in self.in_feature_names:
             f_values = df[col].dropna()
             assert numpy.issubdtype(f_values, numpy.number)
             histogram = sorted(Counter(f_values).items())
             if len(histogram) <= self._n_bins:
-                self._threshold_groups.append(None)
+                self._threshold_groups[col] = None
                 continue
 
             thresholds = []
@@ -172,12 +213,16 @@ class BinNormalizer(FeaturesHandler):
                 thresholds.append((histogram[ih-1][0] + histogram[ih][0])/2)
                 n_items -= count
                 n_bins -= 1
-            self._threshold_groups.append(thresholds)
+            # self._threshold_groups.append(thresholds)
+            self._threshold_groups[col] = thresholds
 
     def apply(self, input_generator):
         for i, value in enumerate(input_generator):
-            thresholds = self._threshold_groups[i]
-            yield i, (bisect_left(thresholds, value) if thresholds else value)
+            col, val = value
+            # thresholds = self._threshold_groups[i]
+            thresholds = self._threshold_groups[col]
+            # yield i, (bisect_left(thresholds, value) if thresholds else value)
+            yield i, (bisect_left(thresholds, val) if thresholds else val)
 
 
 class MinMaxNormalizer(FeaturesHandler):
@@ -221,6 +266,7 @@ class PredicatesHandler(FeaturesHandler):
         self.out_feature_names = out_feature_names
 
     def apply(self, input_generator):
+        # NOTE: FIX HERE TO SUITABLE TO DICTIONARY
         values = list(input_generator)
         indices = self._indices
         return enumerate(predicate(*[values[j] for j in indices[i]])
