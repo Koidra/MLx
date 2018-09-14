@@ -21,6 +21,7 @@ setup(
         'pandas>=0.15.0',
         'scikit_learn>=0.16',
         'xgboost',
+        'lightgbm',
         'matplotlib>=1.4.3',
         'dill>=0.2.2',
         'ipywidgets'],

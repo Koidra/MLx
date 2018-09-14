@@ -74,7 +74,7 @@ class OneToOneMapperHandler(FeaturesHandler):
         yield 0, self._mapper(input_generator.next())
 
 
-class CategoricalHandler(FeaturesHandler):
+class OneHotHandler(FeaturesHandler):
     def __init__(self, in_feature_names, cats={}, preprocessor=None):
         for in_feature_name in cats:
             if in_feature_name not in in_feature_names:
@@ -225,3 +225,69 @@ class PredicatesHandler(FeaturesHandler):
         indices = self._indices
         return enumerate(predicate(*[values[j] for j in indices[i]])
                          for i, predicate in enumerate(self._predicates))
+
+
+class IdEncodingHandler(FeaturesHandler):
+    def __init__(self, in_feature_names, preprocessor=None):
+        super(self.__class__, self).__init__(in_feature_names)
+
+        maps = [None] * len(in_feature_names)
+        self.out_feature_names = [name + '_ide' for name in in_feature_names]
+        self._maps = maps
+        self._count = 0
+        self._preprocessor = lambda x: x if preprocessor is None else preprocessor
+
+    def learn(self, df):
+        maps = self._maps
+        preprocessor = self._preprocessor
+        for i, in_feature_name in enumerate(self.in_feature_names):
+            if maps[i] is not None:
+                continue
+            _map = {}
+            count = 0
+            for value in df[in_feature_name]:
+                value = preprocessor(value)
+                if value not in _map:
+                    _map[value] = count # self._count
+                    count += 1
+            maps[i] = _map
+
+    def apply(self, input_generator):
+        preprocessor = self._preprocessor
+        for i, value in enumerate(input_generator):
+            index = self._maps[i].get(preprocessor(value))
+            if index is not None:
+                yield i, index
+
+"""
+class IdEncodingHandler(FeaturesHandler):
+    def __init__(self, in_feature_names, preprocessor=None):
+        super(self.__class__, self).__init__(in_feature_names)
+        maps = {}
+        self.out_feature_names = [name + '_ide' for name in in_feature_names]
+        self._maps = maps
+        self._count = 0
+        self._preprocessor = lambda x: x if preprocessor is None else preprocessor
+
+    def learn(self, df):
+        maps = self._maps
+        preprocessor = self._preprocessor
+        for i, in_feature_name in enumerate(self.in_feature_names):
+            _map = {}
+            for value in df[in_feature_name]:
+                value = preprocessor(value)
+                if value not in _map:
+                    _map[value] = self._count
+                    # out_feature_names.append(in_feature_name + '=' + str(value))
+                    self._count += 1
+            # maps[i] = _map
+            maps[in_feature_name] = _map
+
+    def apply(self, input_generator):
+        preprocessor = self._preprocessor
+        for i, value in enumerate(input_generator):
+            col, val = value
+            index = self._maps[col].get(preprocessor(val))
+            if index is not None:
+                yield i, index
+"""

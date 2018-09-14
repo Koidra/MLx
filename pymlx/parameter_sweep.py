@@ -1,5 +1,6 @@
 from pandas import DataFrame
 from sklearn.model_selection import RandomizedSearchCV
+import numpy as np
 
 
 def random_sweep(X, y, model, params, n_iter=20, scoring='roc_auc', cv=3,

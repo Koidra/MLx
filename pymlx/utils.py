@@ -29,7 +29,7 @@ def load_data(filename, label_col=None, id_col=None, feature_cols=None, excluded
         return df
 
 
-def load_featurized_data(filename, label_col, feat, in_memory=True):
+def load_featurized_data(filename, label_col, feat, in_memory=True, return_dataframe=False):
     """
     Load raw data into extracted features and labels
     Note that streaming featurization is much slower than in-memory featurization,
@@ -43,7 +43,7 @@ def load_featurized_data(filename, label_col, feat, in_memory=True):
         df, labels = load_data(filename, label_col,
                                feature_cols=f_names,
                                dtype={name: f_types[i] for i, name in enumerate(f_names)})
-        return feat.transform(df), labels
+        return feat.transform(df, return_dataframe), labels
     else:
         dtypes = feat.in_feature_types
         dim = len(dtypes)
@@ -65,13 +65,6 @@ def load_featurized_data(filename, label_col, feat, in_memory=True):
                 labels.append(numpy.float32(row[label_index]))
 
         return feat.to_matrix(data), labels
-
-
-def get_fscores(predictor, feature_names=None):
-    fscores = predictor.booster().get_fscore()
-    if feature_names is not None:
-        fscores = {feature_names[int(f[1:])]: fscores[f] for f in fscores}
-    return Series(fscores).order(ascending=False)
 
 
 def histogram(filename, cols):

@@ -3,7 +3,6 @@ import numpy
 from pandas import DataFrame
 from sklearn import metrics as skmetrics
 from matplotlib import pyplot as plt
-from .model import BinaryClassifier
 
 
 def pr_scorer(predictor, X, y):
@@ -51,8 +50,8 @@ def _show_confusion_matrix(truths, predictions, threshold):
     print('         T{0:10}  |{1:10}  |  P: {2:.2f}%'.format(fn, tp, float(tp) / (fn + tp) * 100))
     print('         |            |            |')
     print('         ===========================')
-    print('Precision   N: {0:.2f}%     P: {1:.2f}%'.format(float(tn) / (tn + fn) * 100,
-                                                           float(tp) / (fp + tp) * 100))
+    print('Precision   N: {0:.2f}%     P: {1:.2f}%'.format(float(tn) / (tn + fn) * 100, float(tp) / (fp + tp) * 100))
+    print('Accuracy: {0:.2f}%'.format(float(tp+tn) / len(truths) * 100))
 
 
 def confusion_matrix(truths, predictions, sampling_rate=1):
@@ -69,18 +68,24 @@ def confusion_matrix(truths, predictions, sampling_rate=1):
 
 
 def diagnose(model, test_df, truths, cols=None, predictions=None, good_to_bad=False, pretty=True):
-    assert isinstance(model, BinaryClassifier)
-    test_features = model.featurizer.transform(test_df)
-    if predictions is None:
-        predictions = model.bulk_predict(test_features)
+    # assert isinstance(model, BinaryClassifier)
 
-    df = DataFrame(test_features.todense(),
+    test_features = model.featurizer.transform(test_df, return_dataframe=False)
+    if predictions is None:
+        predictions, _ = model.bulk_predict(test_df)
+
+    df = DataFrame(test_features.tolist(),
                    columns=model.featurizer.out_feature_names,
                    index=test_df.index)
     status_cols = ['Labeled', 'Predicted Probability', 'diff']
+
     for i, status in enumerate([truths, predictions,
                                 [abs(truths[i] - p) for i, p in enumerate(predictions)]]):
         df[status_cols[i]] = status
+
+    if cols is None:
+        cols = [item for item in df.columns if item not in status_cols]
+
     df = df[status_cols + list(cols)].sort_values('diff', ascending=good_to_bad)
     df.drop('diff', axis=1, inplace=True)
     if pretty:

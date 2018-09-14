@@ -1,10 +1,18 @@
 # Intellij
 .idea/
+.ipynb_checkpoints/
 *.iml
 *.iws
+
+
+pymlx_debug.py
 
 # Binaries
 *.o
 *.a
 
 build/
+pymlx.egg-info/
+__pycache__/
+.vscode/
+_debug.py

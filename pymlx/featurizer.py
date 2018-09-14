@@ -81,12 +81,13 @@ class Featurizer:
                                                    for name in handler.in_feature_names])
             self.out_feature_names.extend(handler.out_feature_names)
 
-        self._initialize_features_vector = lambda: ([], []) if self._sparse else (lambda: [0] * self.size())
+        self._initialize_features_vector = lambda: ([], []) if self._sparse else [0] * self.size()
 
     # Note that we pass through NaNs
     # So either the handlers or the learner needs to handle NaNs
     # The featurizer itself doesn't handle NaNs
     def featurize_row(self, row_raw: List):
+        assert isinstance(row_raw, pd.Series)
         features = self._initialize_features_vector()
         add_feature = self._add_feature
         offset = 0
@@ -99,9 +100,15 @@ class Featurizer:
         return features
 
     # Note: df cannot contain the label column
-    def transform(self, df_raw: DataFrame):
-        transformed = df_raw.apply(self.featurize_row, axis=1)
-        return NotImplemented if self._sparse else transformed.values
+    def transform(self, df_raw: DataFrame, return_dataframe=False):
+        df = df_raw[self.in_feature_names]
+        transformed = df.apply(self.featurize_row, axis=1)
+        if not return_dataframe:
+            return NotImplemented if self._sparse else np.array(transformed.values.tolist())
+        else:
+            # return features as a dataframe
+            return NotImplemented if self._sparse else pd.DataFrame(data=transformed.values.tolist(), columns=self.out_feature_names)
+
 
 
 class CompositionHandler(FeaturesHandler):
@@ -150,7 +157,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
     CAT_INT = 'NEED REVIEW: could be either CategoricalHandler or a numeric handler'
     NA = 'Too difficult to tell'
     numeric_kinds = [BoolHandler, BinNormalizer, 'MinMaxNormalizer', NoHandler]
-    kinds = [CategoricalHandler, 'TextHandler'] + numeric_kinds + \
+    kinds = [OneHotHandler, 'TextHandler'] + numeric_kinds + \
             [CAT_INT, MapperHandler, CompositionHandler, PredicatesHandler, NA]
 
     handlers = {kind: [] for kind in kinds}
@@ -162,7 +169,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
                 if col not in handlers[kind]:
                     handlers[kind].append(col)
                     priors.add(col)
-                    if kind in [CategoricalHandler, BoolHandler] and df[col].dtype != object:
+                    if kind in [OneHotHandler, BoolHandler] and df[col].dtype != object:
                         df[[col]] = df[[col]].astype(object)
 
     for col in df:
@@ -177,12 +184,12 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
                 # https://github.com/pydata/pandas/issues/6625
                 df[[col]] = df[[col]].astype(object)
         elif dtype == str:
-            kind = CategoricalHandler
+            kind = OneHotHandler
             # ToDo: could also be TEXT
         elif numpy.issubdtype(dtype, numpy.integer):
             col_low = col.lower()
             if col_low.endswith('id') or col_low.endswith('code') or col_low.endswith('type'):
-                kind = CategoricalHandler
+                kind = OneHotHandler
                 df[[col]] = df[[col]].astype(str)
             elif col_low.endswith('count') or col_low.endswith('s'):
                 kind = 'numeric'
@@ -201,15 +208,15 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
         handlers[kind].append(col)
 
     ret = AttrDict()
-    pandas.options.display.float_format = '{:.2g}'.format
-    pandas.options.display.max_rows = 500
+    pd.options.display.float_format = '{:.2g}'.format
+    pd.options.display.max_rows = 500
     for kind in kinds:
         if len(handlers[kind]) == 0:
             del handlers[kind]
         else:
             cols = sorted(handlers[kind])
             df_sub = df[cols]
-            if kind == CategoricalHandler or kind == BoolHandler:
+            if kind == OneHotHandler or kind == BoolHandler:
                 desc = df_sub.describe(include=[object]).transpose()
             elif kind in numeric_kinds:
                 desc = df_sub.describe(include=[numpy.number]).transpose()
@@ -224,7 +231,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
             if set(desc.index) != set(cols):
                 print('Outlier columns: {0}'.format(sorted(set(cols) - set(desc.index))))
             samples = df_sub.ix[random.sample(list(df_sub.index), 5)]
-            desc['Sample values'] = Series(
+            desc['Sample values'] = pd.Series(
                 [', '.join(('{:.2g}' if isinstance(val, float) else '{:}')
                            .format(val) for val in samples[col])
                  for col in samples], index=cols)
