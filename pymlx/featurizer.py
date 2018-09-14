@@ -104,7 +104,7 @@ class Featurizer:
         df = df_raw[self.in_feature_names]
         transformed = df.apply(self.featurize_row, axis=1)
         if not return_dataframe:
-            return NotImplemented if self._sparse else transformed.values
+            return NotImplemented if self._sparse else np.array(transformed.values.tolist())
         else:
             # return features as a dataframe
             return NotImplemented if self._sparse else pd.DataFrame(data=transformed.values.tolist(), columns=self.out_feature_names)
