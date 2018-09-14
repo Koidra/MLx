@@ -3,7 +3,6 @@ import numpy
 from pandas import DataFrame
 from sklearn import metrics as skmetrics
 from matplotlib import pyplot as plt
-from .model import BinaryClassifier
 
 
 def pr_scorer(predictor, X, y):
@@ -90,5 +89,5 @@ def diagnose(model, test_df, truths, cols=None, predictions=None, good_to_bad=Fa
     df = df[status_cols + list(cols)].sort_values('diff', ascending=good_to_bad)
     df.drop('diff', axis=1, inplace=True)
     if pretty:
-        df.columns = [name.title().replace('_', ' ').replace('=', ': ') for name in df.columns]
+        df.columns = [name.title().replace('_', ' ') for name in df.columns]
     return df

@@ -4,7 +4,6 @@ from pandas import Series, read_csv
 from .features_handler import *
 from .featurizer import Featurizer
 
-
 # Data Ingestion Utils #
 def load_data(filename, label_col=None, id_col=None, feature_cols=None, excluded_cols=None,
               dtype=None):
@@ -43,10 +42,9 @@ def load_featurized_data(filename, label_col, feat, in_memory=True, return_dataf
         f_types = feat.in_feature_types
         df, labels = load_data(filename, label_col,
                                feature_cols=f_names,
-                               dtype={name: f_types[name] for i, name in enumerate(f_names)}) # <- change to using name
-        return feat.transform(df, return_dataframe=return_dataframe), labels
+                               dtype={name: f_types[i] for i, name in enumerate(f_names)})
+        return feat.transform(df, return_dataframe), labels
     else:
-        # not tested yet
         dtypes = feat.in_feature_types
         dim = len(dtypes)
         with open(filename, 'rb') as csv_file:

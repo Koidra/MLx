@@ -1,8 +1,6 @@
 import random
 import numpy as np
 import pandas as pd
-import pandas
-from pandas import Series
 from typing import Union, List
 from scipy.sparse import csr_matrix
 from .core import *
@@ -10,9 +8,7 @@ from .features_handler import *
 
 
 class Featurizer:
-
     def __init__(self, handlers: List[FeaturesHandler], sparse=False):
-
         assert isinstance(handlers, list)
         in_feature_names = set()
         for handler in handlers:
@@ -67,43 +63,37 @@ class Featurizer:
         if sample_size and len(df) > sample_size:
             df = df.ix[random.sample(list(df.index), sample_size)]
 
-        self.in_feature_types = {} # [] store as a dictionary
-        # name_to_index = {}
+        self.in_feature_types = []
+        name_to_index = {}
         for i, col in enumerate(df):
             dtype = Counter(type(value)
                             for value in df[col] if (value == value)).most_common(1)[0][0]
-            # self.in_feature_types.append(np.float32 if dtype == np.float64
-            #                             else np.int32 if dtype == np.int64 else dtype)
-            self.in_feature_types[col] = np.float32 if dtype == np.float64 \
-                                         else np.int32 if dtype == np.int64 else dtype
-            # name_to_index[col] = i
+            self.in_feature_types.append(np.float32 if dtype == np.float64
+                                         else np.int32 if dtype == np.int64 else dtype)
+            name_to_index[col] = i
 
         self.out_feature_names = []
         self._handlers_feature_indices = []  # indices of the input features for each handler
 
         for handler in self.handlers:
             handler.learn(df)
-            # self._handlers_feature_indices.append([name_to_index[name]
-            #                                       for name in handler.in_feature_names])
-            self._handlers_feature_indices.append([name for name in handler.in_feature_names]) # use name str instead of number
+            self._handlers_feature_indices.append([name_to_index[name]
+                                                   for name in handler.in_feature_names])
             self.out_feature_names.extend(handler.out_feature_names)
 
-        self._initialize_features_vector = lambda: ([], []) if self._sparse else ([0] * self.size())
+        self._initialize_features_vector = lambda: ([], []) if self._sparse else [0] * self.size()
 
     # Note that we pass through NaNs
     # So either the handlers or the learner needs to handle NaNs
     # The featurizer itself doesn't handle NaNs
     def featurize_row(self, row_raw: List):
-        assert isinstance(row_raw, Series)  # this func only works when row_raw is a Series
+        assert isinstance(row_raw, pd.Series)
         features = self._initialize_features_vector()
         add_feature = self._add_feature
         offset = 0
         for h, handler in enumerate(self.handlers):
-            # feature_indices = self._handlers_feature_indices[h]
-            feature_names = self._handlers_feature_indices[h]
-            # for index, value in handler.apply([row_raw[i] for i in feature_indices]):
-            # data = row_raw['Education']
-            for index, value in handler.apply([(name, row_raw[name]) for name in feature_names]):
+            feature_indices = self._handlers_feature_indices[h]
+            for index, value in handler.apply(row_raw[i] for i in feature_indices):
                 if value:
                     add_feature(features, offset + index, value)
             offset += handler.size()
@@ -111,13 +101,14 @@ class Featurizer:
 
     # Note: df cannot contain the label column
     def transform(self, df_raw: DataFrame, return_dataframe=False):
-        assert isinstance(df_raw, DataFrame)
-        transformed = df_raw.apply(self.featurize_row, axis=1, raw=False)
+        df = df_raw[self.in_feature_names]
+        transformed = df.apply(self.featurize_row, axis=1)
         if not return_dataframe:
             return NotImplemented if self._sparse else transformed.values
         else:
             # return features as a dataframe
             return NotImplemented if self._sparse else pd.DataFrame(data=transformed.values.tolist(), columns=self.out_feature_names)
+
 
 
 class CompositionHandler(FeaturesHandler):
@@ -217,10 +208,8 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
         handlers[kind].append(col)
 
     ret = AttrDict()
-    # NOTE THIS
-    pandas.options.display.float_format = '{:.2g}'.format
-    pandas.options.display.max_rows = 500
-
+    pd.options.display.float_format = '{:.2g}'.format
+    pd.options.display.max_rows = 500
     for kind in kinds:
         if len(handlers[kind]) == 0:
             del handlers[kind]
@@ -242,7 +231,7 @@ def suggest_handlers(df, sample_size=10000, trees_optimized=True, hinted_featuri
             if set(desc.index) != set(cols):
                 print('Outlier columns: {0}'.format(sorted(set(cols) - set(desc.index))))
             samples = df_sub.ix[random.sample(list(df_sub.index), 5)]
-            desc['Sample values'] = Series(
+            desc['Sample values'] = pd.Series(
                 [', '.join(('{:.2g}' if isinstance(val, float) else '{:}')
                            .format(val) for val in samples[col])
                  for col in samples], index=cols)

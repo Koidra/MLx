@@ -6,15 +6,12 @@ from pandas import DataFrame, Series
 import dill
 from numpy import float32
 from scipy.sparse import csr_matrix
-from xgboost import XGBModel
-from lightgbm import LGBMModel, Booster
 from .featurizer import Featurizer
 
 
 class BinaryClassifier:
     def __init__(self, predictor, featurizer):
-        # XgBoost model or LightGbm model is accepted
-        assert (isinstance(predictor, XGBModel) or isinstance(predictor, LGBMModel)) and isinstance(featurizer, Featurizer)
+        assert isinstance(featurizer, Featurizer)
 
         self.predictor = predictor
         self.featurizer = featurizer
@@ -58,8 +55,7 @@ class BinaryClassifier:
     #   - Each predictor should indicate whether it supports features importance
     #   11/09/2018: has just implement for xgboost and lightgbm
     def get_fscores(self):
-
-        if isinstance(self.predictor, XGBModel):
+        if self.predictor.__module__ == 'xgboost.sklearn':
             # for xgboost
             # feature_names = self.featurizer.out_feature_names
             fscores = self.predictor.get_booster().get_fscore()
