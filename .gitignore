@@ -10,8 +10,10 @@ pymlx_debug.py
 # Binaries
 *.o
 *.a
+*.ipynb
 
 build/
+demo/
 pymlx.egg-info/
 __pycache__/
 .vscode/

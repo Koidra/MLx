@@ -44,7 +44,7 @@ class BinaryClassifier:
 
     def bulk_predict(self, test_data):
         if isinstance(test_data, DataFrame):
-            test_data = self.featurizer.transform(test_data, return_dataframe=True)
+            test_data = self.featurizer.transform(test_data, return_dataframe=False)
         # assert isinstance(test_data, csr_matrix) # <--
         result = self.predictor.predict_proba(test_data)
         return result[:, 1], result
@@ -54,11 +54,18 @@ class BinaryClassifier:
     #   - Absorb xgboost
     #   - Each predictor should indicate whether it supports features importance
     #   11/09/2018: has just implement for xgboost and lightgbm
-    def get_fscores(self):
+    def get_fscores(self, no_features_name=True):
         if self.predictor.__module__ == 'xgboost.sklearn':
             # for xgboost
             # feature_names = self.featurizer.out_feature_names
-            fscores = self.predictor.get_booster().get_fscore()
+            _fscores = self.predictor.get_booster().get_fscore()
+            fscores = {}
+            if not no_features_name: # when the training data is dataframe
+                fscores = _fscores
+            else:
+                for k, v in _fscores.items():
+                    fscores[self.featurizer.out_feature_names[int(k.replace('f', ''))]] = v
+
             # fscores = {feature_names[int(f[1:])]: fscores[f] for f in fscores}
             return Series(fscores).sort_values(ascending=False)
         else:
@@ -66,8 +73,13 @@ class BinaryClassifier:
             fscores = {}
             booster = self.predictor.booster_
             fimportances = booster.feature_importance()
+            # print('light gbm', fimportances)
             for i, fname in enumerate(booster.feature_name()):
-                fscores[fname] = fimportances[i]
+                if not no_features_name:
+                    fscores[fname] = fimportances[i]
+                else:
+                    fscores[self.featurizer.out_feature_names[int(fname.replace('Column_', ''))]] = fimportances[i]
+
             return Series(fscores).sort_values(ascending=False)
 
 
