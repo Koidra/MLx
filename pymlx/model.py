@@ -28,26 +28,11 @@ class BinaryClassifier:
         """
         return self.featurizer.in_feature_names
 
-    # ToDo: implement scoring for row
-    def predict(self, features):  # <-- meets error
-        """
-        :param features: list or array of feature values.
-        Missing values MUST be encoded as nan, not None.
-        :return: probability of the instance classified as True
-        """
-
-        indices, values = self.featurizer.featurize_row(features) # <-- input features must be a Pandas Series
-        features = csr_matrix((values, indices, [0, len(values)]),
-                              shape=(1, self._num_features),
-                              dtype=float32)
-        return self.predictor.predict_proba(features)[0][1]
-
-    def bulk_predict(self, test_data):
+    def predict(self, test_data):
         if isinstance(test_data, DataFrame):
             test_data = self.featurizer.transform(test_data, return_dataframe=False)
-        # assert isinstance(test_data, csr_matrix) # <--
         result = self.predictor.predict_proba(test_data)
-        return result[:, 1], result
+        return result[:, 1]  # return probability of class 1
 
     # REVIEW: this is specific to xgboost, which is temporary
     # ToDo:
