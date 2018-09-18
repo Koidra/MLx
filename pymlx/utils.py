@@ -3,6 +3,7 @@ from time import time
 from pandas import Series, read_csv
 from .features_handler import *
 from .featurizer import Featurizer
+import numpy as np
 
 # Data Ingestion Utils #
 def load_data(filename, label_col=None, id_col=None, feature_cols=None, excluded_cols=None,
@@ -130,3 +131,4 @@ def report_timing(unit='minute', fresh=True):
     if fresh:
         _elapsed = time() - _start_time
     print('Elapsed: {0:.2g} {1}s'.format(_elapsed / _time_unit_conversion[unit], unit))
+

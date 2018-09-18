@@ -7,13 +7,40 @@ from .core import *
 from .features_handler import *
 
 
+def listable(t):
+    return Union[t, List[t]]
+
+
 class Featurizer:
-    def __init__(self, handlers: List[FeaturesHandler], sparse=False):
-        assert isinstance(handlers, list)
+    def __init__(self,
+                 no_op: listable(str) = None,
+                 categorical: listable(str) = None,
+                 one_hot: listable(str) = None,
+                 binning: listable(str) = None,
+                 custom_handers: listable(FeaturesHandler) = None, sparse=False):
+
+        _handlers = []
+
+        if no_op:
+            _handlers.append(NoHandler(no_op))
+
+        if categorical:
+            _handlers.append(IdEncodingHandler(categorical))
+
+        if one_hot:
+            _handlers.append(OneHotHandler(one_hot))
+
+        if binning:
+            _handlers.append(BinNormalizer(binning))
+
+        if custom_handers:
+            _handlers += custom_handers
+
         in_feature_names = set()
-        for handler in handlers:
-            in_feature_names |= set(handler.in_feature_names)
-        self.handlers = handlers
+
+        for _handler in _handlers:
+            in_feature_names |= set(_handler.in_feature_names)
+        self.handlers = _handlers
         self.in_feature_names = sorted(in_feature_names)
         self.in_feature_types = None
         self.out_feature_names = None
