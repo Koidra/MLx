@@ -132,12 +132,3 @@ def report_timing(unit='minute', fresh=True):
         _elapsed = time() - _start_time
     print('Elapsed: {0:.2g} {1}s'.format(_elapsed / _time_unit_conversion[unit], unit))
 
-
-def dffeats2npfeats(df):
-    """
-    Convert feature table to numpy 2d array
-    :param df: DataFrame
-    :return: numpy.array
-    """
-    assert isinstance(df, DataFrame)
-    return np.array(df.values.tolist())

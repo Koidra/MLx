@@ -60,11 +60,11 @@ class BinaryClassifier:
             # feature_names = self.featurizer.out_feature_names
             _fscores = self.predictor.get_booster().get_fscore()
             fscores = {}
-            if not no_features_name: # when the training data is dataframe
-                fscores = _fscores
-            else:
+            if no_features_name: # when the training data is dataframe
                 for k, v in _fscores.items():
                     fscores[self.featurizer.out_feature_names[int(k.replace('f', ''))]] = v
+            else:
+                fscores = _fscores
 
             # fscores = {feature_names[int(f[1:])]: fscores[f] for f in fscores}
             return Series(fscores).sort_values(ascending=False)
@@ -75,10 +75,10 @@ class BinaryClassifier:
             fimportances = booster.feature_importance()
             # print('light gbm', fimportances)
             for i, fname in enumerate(booster.feature_name()):
-                if not no_features_name:
-                    fscores[fname] = fimportances[i]
-                else:
+                if no_features_name:
                     fscores[self.featurizer.out_feature_names[int(fname.replace('Column_', ''))]] = fimportances[i]
+                else:
+                    fscores[fname] = fimportances[i]
 
             return Series(fscores).sort_values(ascending=False)
 

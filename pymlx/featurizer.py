@@ -13,28 +13,28 @@ def listable(t):
 
 class Featurizer:
     def __init__(self,
-                 handlers: listable(FeaturesHandler) = None,
                  no_op: listable(str) = None,
                  categorical: listable(str) = None,
                  one_hot: listable(str) = None,
-                 binning: listable(str) = None, sparse=False):
+                 binning: listable(str) = None,
+                 custom_handers: listable(FeaturesHandler) = None, sparse=False):
 
         _handlers = []
 
-        if no_op is not None:
+        if no_op:
             _handlers.append(NoHandler(no_op))
 
-        if categorical is not None:
+        if categorical:
             _handlers.append(IdEncodingHandler(categorical))
 
-        if one_hot is not None:
+        if one_hot:
             _handlers.append(OneHotHandler(one_hot))
 
-        if binning is not None:
+        if binning:
             _handlers.append(BinNormalizer(binning))
 
-        if handlers is not None:
-            _handlers += handlers
+        if custom_handers:
+            _handlers += custom_handers
 
         in_feature_names = set()
 
