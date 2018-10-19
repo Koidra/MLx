@@ -12,7 +12,10 @@ class Model(object):
 
     def __init__(self, predictor=None, featurizer=None, model_file=None):
         if model_file:
-            self.__load(model_file)
+            with open(model_file, "rb") as fp:
+                self.featurizer = dill.load(fp)
+                self.predictor = dill.load(fp)
+                self._num_features = self.featurizer.size()
         else:
             assert isinstance(featurizer, Featurizer)
             self.predictor = predictor
@@ -23,12 +26,6 @@ class Model(object):
         with open(filename, "wb") as fp:
             dill.dump(self.featurizer, fp)
             dill.dump(self.predictor, fp)
-
-    def __load(self, filename):
-        with open(filename, "rb") as fp:
-            self.featurizer = dill.load(fp)
-            self.predictor = dill.load(fp)
-            self._num_features = self.featurizer.size()
 
     def get_feature_names(self):
         return self.featurizer.in_feature_names
@@ -77,11 +74,11 @@ class BinaryClassifier(Model):
         return result[:, 1]  # return probability of class 1
 
 
-class RegressionModel(Model):
+class Regressor(Model):
     def __init__(self, predictor, featurizer, model_file=None):
-        super(RegressionModel, self).__init__(predictor, featurizer, model_file)
+        super(Regressor, self).__init__(predictor, featurizer, model_file)
 
     def predict(self, test_data):
         if isinstance(test_data, DataFrame):
             test_data = self.featurizer.transform(test_data, return_dataframe=False)
-        return self.predictor.predict_proba(test_data)
+        return self.predictor.predict(test_data)
