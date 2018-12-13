@@ -66,7 +66,7 @@ class Model(object):
 
 class BinaryClassifier(Model):
     def __init__(self, predictor=None, featurizer=None):
-        super(BinaryClassifier, self).__init__(predictor, featurizer, model_file)
+        super(BinaryClassifier, self).__init__(predictor, featurizer)
 
     def predict(self, test_data):
         if isinstance(test_data, DataFrame):
@@ -76,9 +76,18 @@ class BinaryClassifier(Model):
 
 
 class Regressor(Model):
-    def __init__(self, predictor, featurizer):
-        super(Regressor, self).__init__(predictor, featurizer, model_file)
+    def __init__(self, predictor=None, featurizer=None):
+        super(Regressor, self).__init__(predictor, featurizer)
 
+    def _is_distribution_predictor(self):
+        return NotImplementedError('Check predictor is distribution predictor')
+
+    def predict_mean(self, df):
+        return NotImplementedError('Mean of y if predictor is dist predictor')
+    
+    def predict_mean_std(self, df):
+        return NotImplementedError('Standard Deviation')
+    
     def predict(self, test_data):
         if isinstance(test_data, DataFrame):
             test_data = self.featurizer.transform(test_data, return_dataframe=False)
