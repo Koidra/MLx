@@ -65,7 +65,7 @@ class Model(object):
 
 
 class BinaryClassifier(Model):
-    def __init__(self, predictor=None, featurizer=None, model_file=None):
+    def __init__(self, predictor=None, featurizer=None):
         super(BinaryClassifier, self).__init__(predictor, featurizer, model_file)
 
     def predict(self, test_data):
@@ -76,7 +76,7 @@ class BinaryClassifier(Model):
 
 
 class Regressor(Model):
-    def __init__(self, predictor, featurizer, model_file=None):
+    def __init__(self, predictor, featurizer):
         super(Regressor, self).__init__(predictor, featurizer, model_file)
 
     def predict(self, test_data):
