@@ -10,20 +10,21 @@ from .featurizer import Featurizer
 class Model(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, predictor=None, featurizer=None, model_file=None):
-        if model_file:
-            with open(model_file, "rb") as fp:
-                self.featurizer = dill.load(fp)
-                self.predictor = dill.load(fp)
-                self._num_features = self.featurizer.size()
-        else:
-            assert isinstance(featurizer, Featurizer)
-            self.predictor = predictor
-            self.featurizer = featurizer
-            self._num_features = featurizer.size()
+    def __init__(self, predictor=None, featurizer=None):
+        assert isinstance(featurizer, Featurizer)
+        self.predictor = predictor
+        self.featurizer = featurizer
+        self._num_features = featurizer.size()
 
-    def save(self, filename):
-        with open(filename, "wb") as fp:
+    @staticmethod
+    def load(self, model_path):
+        with open(model_path, "rb") as fp:
+            featurizer = dill.load(fp)
+            predictor = dill.load(fp)
+            return Model(predictor, featurizer)
+
+    def save(self, model_path):
+        with open(model_path, "wb") as fp:
             dill.dump(self.featurizer, fp)
             dill.dump(self.predictor, fp)
 
