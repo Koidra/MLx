@@ -2,43 +2,39 @@
 MLx is a ML library being incubated. This file will be deprecated when the library is released.
 """
 from pandas import DataFrame, Series
-
 import dill
-from numpy import float32
-from scipy.sparse import csr_matrix
+from abc import ABCMeta, abstractmethod
 from .featurizer import Featurizer
 
 
-class BinaryClassifier:
-    def __init__(self, predictor, featurizer):
-        assert isinstance(featurizer, Featurizer)
+class Model(object):
+    __metaclass__ = ABCMeta
 
+    def __init__(self, predictor=None, featurizer=None):
+        assert isinstance(featurizer, Featurizer)
         self.predictor = predictor
         self.featurizer = featurizer
         self._num_features = featurizer.size()
 
-    def save(self, filename):
-        with open(filename, "wb") as fp:
+    @staticmethod
+    def load(self, model_path):
+        with open(model_path, "rb") as fp:
+            featurizer = dill.load(fp)
+            predictor = dill.load(fp)
+            return Model(predictor, featurizer)
+
+    def save(self, model_path):
+        with open(model_path, "wb") as fp:
             dill.dump(self.featurizer, fp)
             dill.dump(self.predictor, fp)
 
     def get_feature_names(self):
-        """
-        :return: list of features required by the model
-        """
         return self.featurizer.in_feature_names
 
+    @abstractmethod
     def predict(self, test_data):
-        if isinstance(test_data, DataFrame):
-            test_data = self.featurizer.transform(test_data, return_dataframe=False)
-        result = self.predictor.predict_proba(test_data)
-        return result[:, 1]  # return probability of class 1
+        pass
 
-    # REVIEW: this is specific to xgboost, which is temporary
-    # ToDo:
-    #   - Absorb xgboost
-    #   - Each predictor should indicate whether it supports features importance
-    #   11/09/2018: has just implement for xgboost and lightgbm
     def get_fscores(self, no_features_name=True):
         if self.predictor.__module__ == 'xgboost.sklearn':
             # for xgboost
@@ -68,10 +64,31 @@ class BinaryClassifier:
             return Series(fscores).sort_values(ascending=False)
 
 
-def load(filename):
-    with open(filename, "rb") as fp:
-        featurizer = dill.load(fp)
-        predictor = dill.load(fp)
-    return BinaryClassifier(predictor, featurizer)
+class BinaryClassifier(Model):
+    def __init__(self, predictor=None, featurizer=None):
+        super(BinaryClassifier, self).__init__(predictor, featurizer)
+
+    def predict(self, test_data):
+        if isinstance(test_data, DataFrame):
+            test_data = self.featurizer.transform(test_data, return_dataframe=False)
+        result = self.predictor.predict_proba(test_data)
+        return result[:, 1]  # return probability of class 1
 
 
+class Regressor(Model):
+    def __init__(self, predictor=None, featurizer=None):
+        super(Regressor, self).__init__(predictor, featurizer)
+
+    def _is_distribution_predictor(self):
+        return NotImplementedError('Check predictor is distribution predictor')
+
+    def predict_mean(self, df):
+        return NotImplementedError('Mean of y if predictor is dist predictor')
+    
+    def predict_mean_std(self, df):
+        return NotImplementedError('Standard Deviation')
+    
+    def predict(self, test_data):
+        if isinstance(test_data, DataFrame):
+            test_data = self.featurizer.transform(test_data, return_dataframe=False)
+        return self.predictor.predict(test_data)
